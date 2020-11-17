@@ -1,5 +1,7 @@
 module DifferentiableNAS
 
-greet() = print("Hello World!")
+include("CIFAR10.jl")
+include("DARTS.jl")
+include("StaticArchitectureNN.jl")
 
 end # module

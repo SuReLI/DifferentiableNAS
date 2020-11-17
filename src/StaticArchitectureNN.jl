@@ -132,8 +132,6 @@ function run_SANN()
 
   # Next, display some of the images from the test set.
 
-  ids = rand(1:10000, 10)
-  image.(valset[ids])
 
   # The outputs are energies for the 10 classes. Higher the energy for a class, the more the
   # network thinks that the image is of the particular class. Every column corresponds to the

@@ -8,9 +8,13 @@ using Zygote
 using LinearAlgebra
 # using CUDA
 
+struct Op
+
+end
+
 struct DARTSModel
   αs::Array{Float32, 2}
-  chains::Array{Op,2}
+  #chains::Array{Op,2}
 end
 
 function flatten_grads(grads)
@@ -49,7 +53,8 @@ function Flux.Optimise.train!(loss, model::DARTSModel, data, opt; cb = () -> ())
     w = all_params(model.chains)
     α = params(model.αs)
     cb = runall(cb)
-    @progress for batch in data
+    #@progress
+    for batch in data
       gsα = grad_loss(model, α)
       if ξ != 0
         model_prime = deepcopy(model)
@@ -107,3 +112,4 @@ function Flux.Optimise.train!(loss, model::DARTSModel, data, opt; cb = () -> ())
       cb()
     end
   end
+end

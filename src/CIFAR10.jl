@@ -1,5 +1,5 @@
-export get_CIFAR10_train, get_CIFAR10_test
-
+#export get_CIFAR10_train, get_CIFAR10_test
+export get_processed_data, get_test_data
 using Metalhead, Images, Flux
 using Flux: onehotbatch
 using Base.Iterators: partition
@@ -9,21 +9,22 @@ function getarray(X)
     Float32.(permutedims(channelview(X), (2, 3, 1)))
 end
 
-function get_processed_data(Args)
+function get_processed_data(args)
     # Fetching the train and validation data and getting them into proper shape
     X = trainimgs(CIFAR10)
-    println("test")
+    println("trainimgs")
     imgs = [getarray(X[i].img) for i in 1:40000]
     #onehot encode labels of batch
 
     labels = onehotbatch([X[i].ground_truth.class for i in 1:40000],1:10)
-
+    println("onehotbatch")
     train_pop = Int((1-args.splitr_)* 40000)
-    train = gpu.([(cat(imgs[i]..., dims = 4), labels[:,i]) for i in partition(1:train_pop, args.batchsize)])
+    #train = gpu.([(cat(imgs[i]..., dims = 4), labels[:,i]) for i in partition(1:train_pop, args.batchsize)])
+    train = ([(cat(imgs[i]..., dims = 4), labels[:,i]) for i in partition(1:train_pop, args.batchsize)])
     valset = collect(train_pop+1:40000)
     valX = cat(imgs[valset]..., dims = 4) # |> gpu
     valY = labels[:, valset] #|> gpu
-
+    println("vals")
     val = (valX,valY)
     return train, val
 end
@@ -41,8 +42,6 @@ function get_test_data()
     return test
 end
 
-
-getarray(X) = float.(permutedims(channelview(X), (2, 3, 1)))
 
 function get_CIFAR10_train(batch_size::Int64, train_portion = 0.5)
   Metalhead.download(CIFAR10)

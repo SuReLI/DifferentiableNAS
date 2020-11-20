@@ -1,4 +1,4 @@
-export LayeredOp, DARTSModel, train!, squeeze
+export LayeredOp, DARTSModel, DARTStrain!, squeeze
 
 using Metalhead, Images
 using Images.ImageCore
@@ -8,6 +8,7 @@ using Base.Iterators
 using StatsBase:mean
 using Zygote
 using LinearAlgebra
+using Juno
 # using CUDA
 
 struct Op
@@ -24,7 +25,7 @@ end
 
 #add in skip connections?
 
-function LayeredOp(input::Int64, output::Int64)
+function LayeredOp()
     l1 = [
         Op(Chain(
             x -> repeat(x, outer = [1, 1, 12, 1]),
@@ -95,13 +96,12 @@ function LayeredOp(input::Int64, output::Int64)
         )),
     ]
     chains = [l1 l2 l3]
-    #print(size(chains))
     weights = softmax(ones(Float32, size(chains)))
     LayeredOp(weights, chains)
 end
 
 function squeeze(A::AbstractArray)
-    print(A, " ", size(A))
+    #print(A, " ", size(A))
     if ndims(A) == 3
         if size(A, 3) > 1
             return dropdims(A; dims = (1))
@@ -138,8 +138,8 @@ struct DARTSModel
   chains::Array{Op,2}
 end
 
-function DARTSModel(input::Int64, output::Int64)
-  lo = LayeredOp(input,output)
+function DARTSModel()
+  lo = LayeredOp()
   αs = lo.weights
   chains = lo.chains
   DARTSModel(αs, chains)
@@ -151,8 +151,6 @@ function (m::DARTSModel)(x)
       x = sum([chain(x) for chain in m.chains[:,i]].*mpw)
   end
   squeeze(x)
-  println(x, " ", size(x))
-  x
 end
 
 Flux.@functor DARTSModel
@@ -182,7 +180,10 @@ function all_params(chains)
   return ps
 end
 
-function train!(loss, model::DARTSModel, train, val, opt; cb = () -> ())
+runall(f) = f
+runall(fs::AbstractVector) = () -> foreach(call, fs)
+
+function DARTStrain!(loss, model, train, val, opt, order; cb = () -> ())
   function grad_loss(model, ps, batch, verbose = false) #do I need batch here?
     #println(loss(model, batch...))
     gs = gradient(ps) do
@@ -190,13 +191,16 @@ function train!(loss, model::DARTSModel, train, val, opt; cb = () -> ())
     end
   end
 
-  ξ = 0
+  if order == "first"
+      ξ = 0
+  else
+      ξ = opt.eta
+  end
   w = all_params(model.chains)
   α = params(model.αs)
   #α = params(model.weights)
-  #cb = runall(cb)
-  #@progress
-  for (train_batch, val_batch) in zip(train, val)
+  cb = runall(cb)
+  @progress for (train_batch, val_batch) in zip(train, val)
     gsα = grad_loss(model, α, val_batch)
     if ξ != 0
       model_prime = deepcopy(model)
@@ -204,20 +208,14 @@ function train!(loss, model::DARTSModel, train, val, opt; cb = () -> ())
       w_prime = all_params(model_prime_α.chains)
 
       gsw_prime = grad_loss(model_prime, w_prime, val_batch)
-      for a in all_params(model_prime.chains).order
-        #println(" gsw_prime ", norm(gsw_prime[a]))
-      end
 
       Flux.Optimise.update!(Descent(ξ), w_prime, gsw_prime)
 
       model_prime_minus = deepcopy(model_prime)
 
-      w_prime_minus = all_params(model_prime_minus.model.chains)
+      w_prime_minus = all_params(model_prime_minus.chains)
 
       gsw_prime_minus = grad_loss(model_prime_minus, w_prime_minus, val_batch)
-      for a in params(model_prime_minus.model.chains).order
-        #println(" gsw_prime_minus ", norm(gsw_prime_minus[a]))
-      end
 
       model_minus = deepcopy(model)
       model_plus = deepcopy(model)
@@ -225,27 +223,18 @@ function train!(loss, model::DARTSModel, train, val, opt; cb = () -> ())
       w_minus = all_params(model_minus.chains)
       w_plus = all_params(model_plus.chains)
 
-      epsilon = 0.01 ./ norm([gsw_prime_minus[w] for w in w_prime_minus.order if gsw_prime_minus[w] != nothing])
-      update_all!(Descent(epsilon), w_minus, [gsw_prime_minus[w] for w in w_prime_minus.order])
-      update_all!(Descent(-1*epsilon), w_plus, [gsw_prime_minus[w] for w in w_prime_minus.order])
+      epsilon = 0.01 ./ norm([gsw_prime_minus[w_] for w_ in w_prime_minus.order])
+      update_all!(Descent(epsilon), w_minus, [gsw_prime_minus[w_] for w_ in w_prime_minus.order])
+      update_all!(Descent(-1*epsilon), w_plus, [gsw_prime_minus[w_] for w_ in w_prime_minus.order])
 
-      gsα_prime = grad_loss(model_prime_α, params(model_prime_α.weights), val_batch)
+      gsα_prime = grad_loss(model_prime_α, params(model_prime_α.αs), val_batch)
 
-      gsα_plus = grad_loss(model_plus, params(model_plus.weights), train_batch)
-      gsα_minus = grad_loss(model_minus, params(model_minus.weights), train_batch)
+      gsα_plus = grad_loss(model_plus, params(model_plus.αs), train_batch)
+      gsα_minus = grad_loss(model_minus, params(model_minus.αs), train_batch)
 
-      for a in params(model_prime_α.weights).order
-        #println(a, " gsα_prime ", gsα_prime[a])
-      end
-
-      for a in params(model_plus.weights).order
-        #println(gsα_plus[a])
-      end
-
-      update_all!(opt, α, [gsα_prime[a] for a in params(model_prime_α.weights).order])
-
-      update_all!(Descent(-1*ξ^2/(2*epsilon)), α, [gsα_plus[a] for a in params(model_plus.weights).order])
-      update_all!(Descent(ξ^2/(2*epsilon)), α, [gsα_minus[a] for a in params(model_minus.weights).order])
+      update_all!(opt, α, [gsα_prime[a] for a in params(model_prime_α.αs).order])
+      update_all!(Descent(-1*ξ^2/(2*epsilon)), α, [gsα_plus[a] for a in params(model_plus.αs).order])
+      update_all!(Descent(ξ^2/(2*epsilon)), α, [gsα_minus[a] for a in params(model_minus.αs).order])
     else
       Flux.Optimise.update!(opt, α, gsα)
     end

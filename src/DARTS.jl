@@ -1,4 +1,4 @@
-export LayeredOp, DARTSModel, train!
+export LayeredOp, DARTSModel, train!, squeeze
 
 using Metalhead, Images
 using Images.ImageCore
@@ -26,82 +26,90 @@ end
 
 function LayeredOp(input::Int64, output::Int64)
     l1 = [
-            Op(Chain(x -> repeat(x, inner = [1, 1, 12, 1]),
-                     x -> relu.(x),
-                     )),
-            Op(Chain(Conv((1,1), 3=>36, stride=(2,2), pad = (0,0)),
-                     x -> relu.(x),
-                     )),
-            Op(Chain(Conv((3,3), 3=>36, stride=(2,2), pad = (1,1)),
-                     x -> relu.(x),
-                     )),
-            Op(Chain(Conv((5,5), 3=>36, stride=(2,2), pad = (2,2)),
-                     x -> relu.(x),
-                     )),
-            Op(Chain(Conv((3,3), 3=>18, pad = (1,1)),
-                     x -> relu.(x),
-                     Conv((3,3), 18=>36, stride=(2,2), pad = (1,1)),
-                     x -> relu.(x),
-                     )),]
+        Op(Chain(
+            x -> repeat(x, outer = [1, 1, 12, 1]),
+            x ->
+                x[1:2:end, 1:2:end, :, :] +
+                x[2:2:end, 2:2:end, :, :] +
+                x[1:2:end, 2:2:end, :, :] +
+                x[2:2:end, 1:2:end, :, :],
+            x -> relu.(x),
+        )),
+        Op(Chain(Conv((1, 1), 3 => 36, stride = (2, 2), pad = (0, 0)), x -> relu.(x))),
+        Op(Chain(Conv((3, 3), 3 => 36, stride = (2, 2), pad = (1, 1)), x -> relu.(x))),
+        Op(Chain(Conv((5, 5), 3 => 36, stride = (2, 2), pad = (2, 2)), x -> relu.(x))),
+        Op(Chain(
+            Conv((3, 3), 3 => 18, pad = (1, 1)),
+            x -> relu.(x),
+            Conv((3, 3), 18 => 36, stride = (2, 2), pad = (1, 1)),
+            x -> relu.(x),
+        )),
+    ]
     l2 = [
-            Op(Chain(x -> x[1:2:end,1:2:end,:,:]+x[2:2:end,2:2:end,:,:], #change to maxpool?
-                     x -> relu.(x),
-                     )),
-            Op(Chain(Conv((1,1), 36=>36, stride=(4,4), pad = (0,0)),
-                     x -> relu.(x),
-                     )),
-            Op(Chain(Conv((3,3), 36=>36, stride=(4,4), pad = (2,2)),
-                     x -> relu.(x),
-                     )),
-            Op(Chain(Conv((5,5), 36=>36, stride=(4,4), pad = (4,4)),
-                     x -> relu.(x),
-                     )),
-            Op(Chain(Conv((3,3), 36=>36, pad = (2,2)),
-                     x -> relu.(x),
-                     Conv((3,3), 36=>36, stride=(4,4), pad = (2,2)),
-                     x -> relu.(x),
-                     )),]
+        Op(Chain(
+            x ->
+                x[1:2:end, 1:2:end, :, :] +
+                x[2:2:end, 2:2:end, :, :] +
+                x[1:2:end, 2:2:end, :, :] +
+                x[2:2:end, 1:2:end, :, :], #change to maxpool?
+            x ->
+                x[1:2:end, 1:2:end, :, :] +
+                x[2:2:end, 2:2:end, :, :] +
+                x[1:2:end, 2:2:end, :, :] +
+                x[2:2:end, 1:2:end, :, :], #change to maxpool?
+            x -> relu.(x),
+        )),
+        Op(Chain(Conv((1, 1), 36 => 36, stride = (4, 4), pad = (0, 0)), x -> relu.(x))),
+        Op(Chain(Conv((3, 3), 36 => 36, stride = (4, 4), pad = (1, 1)), x -> relu.(x))),
+        Op(Chain(Conv((5, 5), 36 => 36, stride = (4, 4), pad = (2, 2)), x -> relu.(x))),
+        Op(Chain(
+            Conv((3, 3), 36 => 36, pad = (1, 1)),
+            x -> relu.(x),
+            Conv((3, 3), 36 => 36, stride = (4, 4), pad = (1, 1)),
+            x -> relu.(x),
+        )),
+    ]
     l3 = [
-            Op(Chain(x -> x[1:2:end,1:2:end,1:4:end,:]
-                            +x[2:2:end,2:2:end,2:4:end,:]
-                            +x[1:2:end,1:2:end,3:4:end,:]
-                            +x[2:2:end,2:2:end,2:4:end,:], #change to maxpool?
-                     x -> relu.(x),
-                     )),
-            Op(Chain(Conv((1,1), 36=>10, stride=(4,4), pad = (0,0)),
-                     x -> relu.(x),
-                     )),
-            Op(Chain(Conv((3,3), 36=>10, stride=(4,4), pad = (2,2)),
-                     x -> relu.(x),
-                     )),
-            Op(Chain(Conv((5,5), 36=>10, stride=(4,4), pad = (4,4)),
-                     x -> relu.(x),
-                     )),
-            Op(Chain(Conv((3,3), 36=>24, pad = (1,1)),
-                     x -> relu.(x),
-                     Conv((3,3), 24=>10, stride=(4,4), pad = (2,2)),
-                     x -> relu.(x),
-                     )),
-
-            ]
+        Op(Chain(
+            x ->
+                x[1:2:end, 1:2:end, 1:2:end, :] +
+                x[2:2:end, 2:2:end, 2:2:end, :] +
+                x[1:2:end, 2:2:end, 1:2:end, :] +
+                x[2:2:end, 1:2:end, 2:2:end, :], #change to maxpool?
+            x ->
+                x[1:2:end, 1:2:end, 1:2:end, :] +
+                x[2:2:end, 2:2:end, 2:2:end, :] +
+                x[1:2:end, 2:2:end, 1:2:end, :] +
+                x[2:2:end, 1:2:end, 2:2:end, :], #change to maxpool?
+            x -> cat(x, sum(x, dims = 3), dims = 3),
+            x -> relu.(x),
+        )),
+        Op(Chain(Conv((1, 1), 36 => 10, stride = (4, 4), pad = (0, 0)), x -> relu.(x))),
+        Op(Chain(Conv((3, 3), 36 => 10, stride = (4, 4), pad = (1, 1)), x -> relu.(x))),
+        Op(Chain(Conv((5, 5), 36 => 10, stride = (4, 4), pad = (2, 2)), x -> relu.(x))),
+        Op(Chain(
+            Conv((3, 3), 36 => 24, pad = (1, 1)),
+            x -> relu.(x),
+            Conv((3, 3), 24 => 10, stride = (4, 4), pad = (1, 1)),
+            x -> relu.(x),
+        )),
+    ]
     chains = [l1 l2 l3]
     #print(size(chains))
-    weights = softmax(ones(Float32,size(chains)))
-    LayeredOp(weights,chains)
+    weights = softmax(ones(Float32, size(chains)))
+    LayeredOp(weights, chains)
 end
 
-
-
 function squeeze(A::AbstractArray)
-    #print(A, " ", size(A))
+    print(A, " ", size(A))
     if ndims(A) == 3
-        if size(A, 3) == 32
+        if size(A, 3) > 1
             return dropdims(A; dims = (1))
         elseif size(A, 3) == 1
             return dropdims(A; dims = (1,3))
         end
     elseif ndims(A) == 4
-        if size(A, 4) == 32
+        if size(A, 4) > 1
             return dropdims(A; dims = (1,2))
         elseif size(A, 4) == 1
             return dropdims(A; dims = (1,2,4))
@@ -115,15 +123,9 @@ function get_size(A::AbstractArray)
     return A
 end
 
-
-
 function (m::LayeredOp)(x)
-    x = repeat(reshape(x, 4, 1, 1, :), inner = [1, 4, 1, 1])
-    #println(size(m.weights))
     for i = 1:size(m.weights,2)
         mpw = softmax(m.weights[:,i])
-        #[print(size(chain(x))) for chain in m.chains[:,i]]
-        #println()
         x = sum([chain(x) for chain in m.chains[:,i]].*mpw)
     end
     squeeze(x)
@@ -144,19 +146,16 @@ function DARTSModel(input::Int64, output::Int64)
 end
 
 function (m::DARTSModel)(x)
-  #x = repeat(reshape(x, 4, 1, 1, :), inner = [1, 4, 1, 1])
   for i = 1:size(m.αs,2)
       mpw = softmax(m.αs[:,i])
-      println("sum following", mpw, size(m.chains))
-      for chain in m.chains[:,i]
-          println(size(chain(x)))
-      end
-      println("test")
-      println("test")
       x = sum([chain(x) for chain in m.chains[:,i]].*mpw)
   end
   squeeze(x)
+  println(x, " ", size(x))
+  x
 end
+
+Flux.@functor DARTSModel
 
 function flatten_grads(grads)
   xs = Zygote.Buffer([])
@@ -183,20 +182,18 @@ function all_params(chains)
   return ps
 end
 
-
 function train!(loss, model::DARTSModel, train, val, opt; cb = () -> ())
   function grad_loss(model, ps, batch, verbose = false) #do I need batch here?
-    println(size(batch[1]))
-    println(size(model(batch[1])))
-    println(size(batch[2]))
+    #println(loss(model, batch...))
     gs = gradient(ps) do
       loss(model, batch...) #does model work here?
-      return gs
     end
   end
 
+  ξ = 0
   w = all_params(model.chains)
   α = params(model.αs)
+  #α = params(model.weights)
   #cb = runall(cb)
   #@progress
   for (train_batch, val_batch) in zip(train, val)
@@ -234,8 +231,8 @@ function train!(loss, model::DARTSModel, train, val, opt; cb = () -> ())
 
       gsα_prime = grad_loss(model_prime_α, params(model_prime_α.weights), val_batch)
 
-      gsα_plus = grad_loss(model_plus, params(Q_plus.weights), train_batch)
-      gsα_minus = grad_loss(model_minus, params(Q_minus.weights), train_batch)
+      gsα_plus = grad_loss(model_plus, params(model_plus.weights), train_batch)
+      gsα_minus = grad_loss(model_minus, params(model_minus.weights), train_batch)
 
       for a in params(model_prime_α.weights).order
         #println(a, " gsα_prime ", gsα_prime[a])
@@ -252,8 +249,8 @@ function train!(loss, model::DARTSModel, train, val, opt; cb = () -> ())
     else
       Flux.Optimise.update!(opt, α, gsα)
     end
-    gsw = grad_loss(Q, w, train_batch)
+    gsw = grad_loss(model, w, train_batch)
     Flux.Optimise.update!(opt, w, gsw)
-    cb()
+    #cb()
   end
 end

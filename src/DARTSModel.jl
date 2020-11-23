@@ -152,7 +152,7 @@ struct Cell
     reduction
 end
 
-function Cell(C_pp, C_p, C, red, red_p, steps = 4, multiplier = 4)
+function Cell(C_pp, C_p, C, red, red_p, steps, multiplier)
     if red_p
         p0 = FactorizedReduce(C_pp,C)
     else
@@ -182,7 +182,7 @@ end
 Flux.@functor Cell
 
 
-function DARTSNetwork(α_normal, α_reduce, num_classes = 10, layers = 8, C = 16, steps = 4, mult = 4 , stem_mult = 3)
+function DARTSNetwork(α_normal, α_reduce; num_classes = 10, layers = 8, C = 16, steps = 4, mult = 4 , stem_mult = 3)
     C_c = C*stem_mult
     stem = Chain(
         Conv((3,3), 3=>C_c, pad=(1,1)),
@@ -201,7 +201,6 @@ function DARTSNetwork(α_normal, α_reduce, num_classes = 10, layers = 8, C = 16
             red = false
             weights = α_normal
         end
-        println(C_pp, C_p, C_c, red, red_p, steps, mult)
         cell = Cell(C_pp, C_p, C_c, red, red_p, steps, mult)
         red_p = red
         #model = cell(model)
@@ -215,9 +214,8 @@ function DARTSNetwork(α_normal, α_reduce, num_classes = 10, layers = 8, C = 16
         push!(cells, cell)
     end
 
-    global_pooling = AdaptiveMeanPool(1)
+    global_pooling = AdaptiveMeanPool((1,1))
     classifier = Dense(C_p, num_classes)
-
     DARTSModel(vcat(α_normal, α_reduce), [s0, s1, cells..., global_pooling, classifier])
 end
 

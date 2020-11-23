@@ -9,15 +9,15 @@ function getarray(X)
     Float32.(permutedims(channelview(X), (2, 3, 1)))
 end
 
-function get_processed_data(args)
+function get_processed_data(splitr = 0.5, batchsize = 64)
     # Fetching the train and validation data and getting them into proper shape
     X = trainimgs(CIFAR10)
     imgs = [getarray(X[i].img) for i in 1:40000]
     labels = onehotbatch([X[i].ground_truth.class for i in 1:40000],1:10)
-    train_pop = Int((1-args.splitr_)* 40000)
-    #train = gpu.([(cat(imgs[i]..., dims = 4), labels[:,i]) for i in partition(1:train_pop, args.batchsize)])
-    train = ([(cat(imgs[i]..., dims = 4), labels[:,i]) for i in partition(1:train_pop, args.batchsize)])
-    val = ([(cat(imgs[i]..., dims = 4), labels[:,i]) for i in partition(train_pop+1:40000, args.batchsize)])
+    train_pop = Int((1-splitr)* 40000)
+    #train = gpu.([(cat(imgs[i]..., dims = 4), labels[:,i]) for i in partition(1:train_pop, batchsize)])
+    train = ([(cat(imgs[i]..., dims = 4), labels[:,i]) for i in partition(1:train_pop, batchsize)])
+    val = ([(cat(imgs[i]..., dims = 4), labels[:,i]) for i in partition(train_pop+1:40000, batchsize)])
     return train, val
 end
 

@@ -1,6 +1,6 @@
 name = "DifferentiableNAS"
 uuid = "97672e4d-b560-4b91-a618-9cf913ebb316"
-authors = ["kaitlin "]
+authors = ["Kaitlin Maile"]
 version = "0.1.0"
 
 [deps]

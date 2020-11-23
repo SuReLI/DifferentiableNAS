@@ -1,8 +1,7 @@
 
 module DifferentiableNAS
 
-include("CIFAR10.jl")
-include("DARTS.jl")
-include("StaticArchitectureNN.jl")
+include("DARTSModel.jl")
+include("DARTSTraining.jl")
 
 end # module

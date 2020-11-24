@@ -5,4 +5,4 @@ using Test
 end
 
 
-# include("DARTS_tests.jl")
+include("DARTS_model_test.jl")

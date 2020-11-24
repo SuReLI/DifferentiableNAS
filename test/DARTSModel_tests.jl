@@ -1,7 +1,7 @@
 using Revise
 using DifferentiableNAS
 using Flux
-using Flux: throttle
+using Flux: throttle, logitcrossentropy, onecold
 Revise.includet("../data/CIFAR10.jl")
 
 steps = 4
@@ -42,4 +42,7 @@ accuracy(m, test...)
 
 m
 
-DARTStrain!(loss, m, train[1:5], val[1:5], optimizer, "second"; cb = evalcb)
+DARTStrain1st!(loss, m, train[1:5], val[1:5], optimizer; cb = evalcb)
+
+loss(m, train[1]...)
+accuracy(m, test...)

@@ -50,8 +50,8 @@ DilConv(channels_in, channels_out, kernel_size, stride, pad, dilation) = Chain(
     BatchNorm(channels_out),
 )
 
-Identity(stride, pad) = x -> x[1:stride:end, 1:stride:end, :, :] |> f32
-Zero(stride, pad) = x -> x[1:stride:end, 1:stride:end, :, :] * 0 |> f32
+Identity(stride, pad) = x -> x[1:stride:end, 1:stride:end, :, :]
+Zero(stride, pad) = x -> x[1:stride:end, 1:stride:end, :, :] * 0
 
 SkipConnect(channels_in, channels_out, stride, pad) = stride == 1 ? Identity(stride, pad) : FactorizedReduce(channels_in, channels_out, stride)
 
@@ -69,14 +69,15 @@ end
 
 PRIMITIVES = [
     "none",
-    #identity",
     "max_pool_3x3",
     "avg_pool_3x3",
     "skip_connect",
     "sep_conv_3x3",
     "sep_conv_5x5",
+    #"sep_conv_7x7",
     #"dil_conv_3x3",
-    #"dil_conv_5x5"
+    #"dil_conv_5x5",
+    #"conv_7x1_1x7"
 ]
 
 #TODO: change to NamedTuple
@@ -89,7 +90,6 @@ OPS = Dict(
     "max_pool_3x3" =>
         (channels, stride, w) ->
             Chain(MaxPool((3, 3), stride = stride, pad = 1), BatchNorm(channels)),
-    #"skip_connect" => (channels, stride, w) -> Chain(stride == 1 ? Identity() : FactorizedReduce(channels, C), x->w.*x),
     "skip_connect" =>
         (channels, stride, w) -> Chain(SkipConnect(channels, channels, stride, 1)),
     "sep_conv_3x3" => (channels, stride, w) -> SepConv(channels, channels, (3, 3), stride, 1),
@@ -117,7 +117,7 @@ function (m::MixedOp)(x, αs)
     for op in m.ops
         #print(size(op(x)), " ")
     end
-    #println()
+    ##println()
     sum([op(x) for op in m.ops] .* αs)
 end
 
@@ -134,16 +134,16 @@ end
 
 function Cell(channels_before_last, channels_last, channels, reduce, reduce_previous, steps, multiplier)
     if reduce_previous
-        prelayer1 = FactorizedReduce(channels_before_last,channels,1)
+        prelayer1 = FactorizedReduce(channels_before_last,channels,2)
     else
         prelayer1 = ReLUConvBN(channels_before_last,channels,(1,1),1,0)
     end
     prelayer2 = ReLUConvBN(channels_last,channels,(1,1),1,0)
     mixedops = []
-    for i = 1:steps
-       for j = 1:2+i
-            reduce && j < 3 ? stride = 2 : stride = 1
-            #println("i:", i, " j:", j, " s:", stride)
+    for i = 0:steps-1
+       for j = 0:2+i-1
+            reduce && j < 2 ? stride = 2 : stride = 1
+            ##println("i:", i, " j:", j, " s:", stride)
             mixedop = MixedOp(channels, stride)
             push!(mixedops, mixedop)
         end
@@ -152,22 +152,21 @@ function Cell(channels_before_last, channels_last, channels, reduce, reduce_prev
 end
 
 function (m::Cell)(x1, x2, αs)
-    println("x1:", size(x1), " x2:", size(x2))
-    println("pl1:", size(m.prelayer1(x1)), " pl2:", size(m.prelayer2(x2)))
+    #println("x1:", size(x1), " x2:", size(x2))
+    #println("pl1:", size(m.prelayer1(x1)), " pl2:", size(m.prelayer2(x2)))
     states = [m.prelayer1(x1), m.prelayer2(x2)]
     offset = 0
     for i in 1:m.steps
-        println(offset+1, ":", offset+size(states,1))
+        #println(offset+1, ":", offset+size(states,1))
         for (j, h) in enumerate(states)
-            println("to sum ", j, ": ", size(m.mixedops[offset+j](h, αs[offset+j,:])))
+            #println("to sum ", j, ": ", size(h), "->", size(m.mixedops[offset+j](h, αs[offset+j,:])))
         end
         state = sum([m.mixedops[offset+j](earlier_state, αs[offset+j,:]) for (j, earlier_state) in enumerate(states)])
         offset += size(states,1)
-        println("state ", i, ": ",size(state))
+        #println("state ", i, ": ",size(state))
         push!(states, state)
     end
-    println(size(cat(states[m.steps-m.multiplier+2:m.steps]..., dims = 3)))
-    cat(states[m.steps-m.multiplier+1:m.steps]..., dims = 3)
+    cat(states[length(states)-m.multiplier+1:end]..., dims = 3)
 end
 
 Flux.@functor Cell
@@ -200,7 +199,7 @@ function DARTSNetwork(α_normal, α_reduce; num_classes = 10, layers = 8, channe
         else
             reduce = false
         end
-        println(i, ": ", channels_before_last, ", ", channels_last, ", ", channels_current, ", ", reduce, ", ", reduce_previous, ", ", steps, ", ", mult)
+        ##println(i, ": ", channels_before_last, ", ", channels_last, ", ", channels_current, ", ", reduce, ", ", reduce_previous, ", ", steps, ", ", mult)
         cell = Cell(channels_before_last, channels_last, channels_current, reduce, reduce_previous, steps, mult)
         push!(cells, cell)
 
@@ -214,8 +213,6 @@ function DARTSNetwork(α_normal, α_reduce; num_classes = 10, layers = 8, channe
     DARTSModel(α_normal, α_reduce, stem, cells, global_pooling, classifier)
 end
 
-#Flux.@functor DARTSNetwork
-
 function (m::DARTSModel)(x)
     s1 = m.stem(x)
     s2 = m.stem(x)
@@ -226,5 +223,7 @@ function (m::DARTSModel)(x)
         s2 = new_state
     end
     out = m.global_pooling(s2)
+    #println("preclass size:", size(out))
+    #println("final size:", size(m.classifier(squeeze(out))))
     m.classifier(squeeze(out))
 end

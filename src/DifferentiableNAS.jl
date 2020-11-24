@@ -8,9 +8,9 @@ using Zygote
 using LinearAlgebra
 # using CUDA
 
-include("DARTSToyModel.jl")
-include("DARTSModel.jl")
-include("DARTSTraining.jl")
+include("DARTS_toy_model.jl")
+include("DARTS_model.jl")
+include("DARTS_training.jl")
 include("utils.jl")
 
 end # module

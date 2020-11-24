@@ -1,4 +1,4 @@
-export squeeze
+export squeeze, all_ws, all_αs
 
 function squeeze(A::AbstractArray) #generalize this? move to utils?
     if ndims(A) == 3
@@ -15,4 +15,12 @@ function squeeze(A::AbstractArray) #generalize this? move to utils?
         end
     end
     return A
+end
+
+function all_params(submodels)
+    ps = Params()
+    for submodel in submodels
+        Flux.params!(ps, submodel)
+    end
+    return ps
 end

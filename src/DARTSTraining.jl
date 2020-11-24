@@ -1,4 +1,4 @@
-export DARTStrain!, squeeze
+export DARTStrain!
 
 using Flux
 using Juno

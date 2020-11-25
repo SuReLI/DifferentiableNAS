@@ -34,7 +34,7 @@ gradient((x1, x2) -> sum(cell(x1, x2, αs)), rand(8,8,4,2), rand(8,8,4,2))
 batchsize = 2
 throttle_ = 2
 splitr = 0.5
-evalcb = throttle(() -> @show(loss(model, test...)), throttle_)
+evalcb = throttle(() -> @show(loss(m, test...)), throttle_)
 loss(m, x, y) = logitcrossentropy(squeeze(m(x)), y)
 function accuracy(m, x, y)
     mean(onecold(m(x), 1:10) .== onecold(y, 1:10))
@@ -49,8 +49,8 @@ loss(m, train[1]...)
 #accuracy(m, test...)
 
 m
-
 DARTStrain1st!(loss, m, train[1:5], val[1:5], optimizer; cb = evalcb)
+
 
 loss(m, train[1]...)
 #accuracy(m, test...)

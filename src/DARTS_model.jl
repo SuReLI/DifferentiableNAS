@@ -16,15 +16,16 @@ ReLUConvBN(channels_in, channels_out, kernel_size, stride, pad) = Chain(
     BatchNorm(channels_out),
 )
 
-FactorizedReduce(channels_in, channels_out, stride) = Chain(
+function FactorizedReduce(channels_in, channels_out, stride)
+    odd = Conv((1, 1), channels_in => channels_out ÷ stride, stride = (stride, stride))
+    even = Conv((1, 1), channels_in => channels_out ÷ stride, stride = (stride, stride))
+
+    Chain(
     x -> relu.(x),
-    x -> cat(
-        Conv((1, 1), channels_in => channels_out ÷ stride, stride = (stride, stride))(x),
-        Conv((1, 1), channels_in => channels_out ÷ stride, stride = (stride, stride))(x[2:end, 2:end, :, :]),
-        dims = 3,
-    ), #dims?
-    BatchNorm(channels_out),
-)
+    x -> cat(odd(x), even(x[2:end, 2:end, :, :]), dims = 3),
+    BatchNorm(channels_out)
+    )
+end
 
 SepConv(channels_in, channels_out, kernel_size, stride, pad) = Chain(
     x -> relu.(x),
@@ -143,7 +144,6 @@ function Cell(channels_before_last, channels_last, channels, reduce, reduce_prev
     for i = 0:steps-1
        for j = 0:2+i-1
             reduce && j < 2 ? stride = 2 : stride = 1
-            ##println("i:", i, " j:", j, " s:", stride)
             mixedop = MixedOp(channels, stride)
             push!(mixedops, mixedop)
         end
@@ -152,30 +152,21 @@ function Cell(channels_before_last, channels_last, channels, reduce, reduce_prev
 end
 
 function (m::Cell)(x1, x2, αs)
-    #println("x1:", size(x1), " x2:", size(x2))
-    #println("pl1:", size(m.prelayer1(x1)), " pl2:", size(m.prelayer2(x2)))
-    states = [m.prelayer1(x1), m.prelayer2(x2)]
-    output = Array{Float32,4}
+    state1 = m.prelayer1(x1)
+    state2 = m.prelayer2(x2)
+    states = Zygote.Buffer([state1], m.steps+2)
+
+    states[1] = state1
+    states[2] = state2
     offset = 0
-    for i in 1:m.steps
-        #println(offset+1, ":", offset+size(states,1))
-        for (j, h) in enumerate(states)
-            #println("to sum ", j, ": ", size(h), "->", size(m.mixedops[offset+j](h, αs[offset+j,:])))
-        end
-        state = sum([m.mixedops[offset+j](earlier_state, αs[offset+j,:]) for (j, earlier_state) in enumerate(states)])
-        offset += size(states,1)
-        #println("state ", i, ": ",size(state))
-        push!(states, state)
-        println(i, " ", m.steps + 2 - m.multiplier + 1)
-        if i == m.steps + 2 - m.multiplier + 1
-            output = state
-        elseif i > m.steps + 2 - m.multiplier + 1
-            cat(output, state, dims = 3)
-        end
+    for step in 1:m.steps
+        state = sum([m.mixedops[offset+j](states[j], αs[offset+j,:]) for j in 1:step+1])
+        offset += step + 1
+        states[step+2] = state
     end
-    println(size(cat(states[length(states)-m.multiplier+1:end]..., dims = 3)), size(output))
-    cat(states[length(states)-m.multiplier+1:end]..., dims = 3)
-    #output
+    states_ = copy(states)
+    out = cat(states_[m.steps+2-m.multiplier+1:m.steps+2]..., dims = 3)
+    out
 end
 
 Flux.@functor Cell

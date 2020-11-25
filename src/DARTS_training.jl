@@ -30,8 +30,8 @@ end
 runall(f) = f
 runall(fs::AbstractVector) = () -> foreach(call, fs)
 
-all_αs(model::DifferentiableNAS.DARTSModel) = all_params([model.normal_αs, model.reduce_αs])
-all_ws(model::DifferentiableNAS.DARTSModel) = all_params([model.stem, model.cells..., model.global_pooling, model.classifier])
+all_αs(model::DARTSModel) = all_params([model.normal_αs, model.reduce_αs])
+all_ws(model::DARTSModel) = all_params([model.stem, model.cells..., model.global_pooling, model.classifier])
 
 function DARTStrain1st!(loss, model, train, val, opt; cb = () -> ())
     function grad_loss(model, ps, batch, verbose = false)
@@ -46,8 +46,8 @@ function DARTStrain1st!(loss, model, train, val, opt; cb = () -> ())
     cb = runall(cb)
     #@progress
     for (train_batch, val_batch) in zip(train, val)
-        gsα = grad_loss(model, α, val_batch)
-        Flux.Optimise.update!(opt, α, gsα)
+        #gsα = grad_loss(model, α, val_batch)
+        #Flux.Optimise.update!(opt, α, gsα)
 
         gsw = grad_loss(model, w, train_batch)
         Flux.Optimise.update!(opt, w, gsw)

@@ -114,11 +114,6 @@ end
 MixedOp(channels::Int64, stride::Int64) = MixedOp([OPS[prim](channels, stride, 1) for prim in PRIMITIVES])
 
 function (m::MixedOp)(x, αs)
-    #print(size(x), " -> ")
-    for op in m.ops
-        #print(size(op(x)), " ")
-    end
-    ##println()
     sum([op(x) for op in m.ops] .* αs)
 end
 
@@ -199,7 +194,6 @@ function DARTSNetwork(α_normal, α_reduce; num_classes = 10, layers = 8, channe
         else
             reduce = false
         end
-        ##println(i, ": ", channels_before_last, ", ", channels_last, ", ", channels_current, ", ", reduce, ", ", reduce_previous, ", ", steps, ", ", mult)
         cell = Cell(channels_before_last, channels_last, channels_current, reduce, reduce_previous, steps, mult)
         push!(cells, cell)
 
@@ -223,7 +217,5 @@ function (m::DARTSModel)(x)
         s2 = new_state
     end
     out = m.global_pooling(s2)
-    #println("preclass size:", size(out))
-    #println("final size:", size(m.classifier(squeeze(out))))
     m.classifier(squeeze(out))
 end

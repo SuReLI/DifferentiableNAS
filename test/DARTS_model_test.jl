@@ -1,10 +1,9 @@
 using DifferentiableNAS
 using Flux
-using Flux: throttle, logitcrossentropy, onecold
-using StatsBase: mean
 include("CIFAR10.jl")
 
 @testset "DARTS MixedOp" begin
+    num_ops = length(PRIMITIVES)
     mo = MixedOp(4,1)
     @test length(params(mo).order) > 0
     input = rand(Float32,8,8,4,2)
@@ -14,6 +13,10 @@ include("CIFAR10.jl")
 end
 
 @testset "DARTS Cell" begin
+    steps = 4
+    k = floor(Int, steps^2/2+3*steps/2)
+    num_ops = length(PRIMITIVES)
+    input = rand(Float32,8,8,4,2)
     cell = Cell(4, 4, 1, false, false, 4, 4)
     @test length(params(cell).order) > 0
     αs = rand(Float32, k, num_ops)
@@ -44,28 +47,4 @@ end
     @test length(all_αs(m).order) == 2
     @test length(all_αs(m).order) + length(all_ws(m).order) == length(params(m).order)
     @test length(params(m.cells).order) > 1
-
-    batchsize = 64
-    throttle_ = 2
-    splitr = 0.5
-    evalcb = throttle(() -> @show(loss(m, test...)), throttle_)
-    loss(m, x, y) = logitcrossentropy(squeeze(m(x)), y)
-    function accuracy(m, x, y)
-        mean(onecold(m(x), 1:10) .== onecold(y, 1:10))
-    end
-    optimizer = ADAM()
-    train, val = get_processed_data(splitr, batchsize)
-    test = get_test_data()
-
-    #loss(m, train[1]...)
-    #accuracy(m, test...)
-
-    #m
-    #DARTStrain1st!(loss, m, train[1:5], val[1:5], optimizer; cb = evalcb)
-
-
-    #loss(m, train[1]...)
-    #accuracy(m, test...)
-
-
 end

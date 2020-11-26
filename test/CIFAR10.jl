@@ -2,17 +2,21 @@
 using Metalhead, Images, Flux
 using Flux: onehotbatch
 using Base.Iterators: partition
+using Random
 
 # Function to convert the RGB image to Float64 Arrays
 function getarray(X)
     Float32.(permutedims(channelview(X), (2, 3, 1)))
 end
 
-function get_test_data()
+function get_test_data(get_proportion = 1.0)
     # Fetch the test data from Metalhead and get it into proper shape.
     test = valimgs(CIFAR10)
-    testimgs = [getarray(test[i].img) for i in 1:1000]
-    testY = onehotbatch([test[i].ground_truth.class for i in 1:1000], 1:10)# |> gpu
+    if get_proportion < 1
+        test = test[shuffle(1:length(test))[1:Int64(length(test)*get_proportion)]]
+    end
+    testimgs = [getarray(test[i].img) for i in 1:length(test)]
+    testY = onehotbatch([test[i].ground_truth.class for i in 1:length(test)], 1:10)# |> gpu
     testX = cat(testimgs..., dims = 4)# |> gpu
     test = (testX,testY)
     return test

@@ -3,7 +3,7 @@ using DifferentiableNAS
 using Flux
 using Flux: throttle, logitcrossentropy, onecold
 using StatsBase: mean
-Revise.includet("../data/CIFAR10.jl")
+Revise.includet("CIFAR10.jl")
 
 steps = 4
 k = floor(Int, steps^2/2+3*steps/2)
@@ -22,7 +22,7 @@ co2 = MixedOp(4,1)
 params(co2)
 size(co2(rand(Float32,8,8,4,2), rand(Float32,num_ops)))
 α = rand(num_ops)
-gradient(x -> sum(co2(x, α)), rand(8,8,4,2))
+gradient(x -> sum(co2(x, α)), rand(Float32,8,8,4,2))
 
 cell = Cell(4, 4, 1, false, false, 4, 4)
 params(cell)

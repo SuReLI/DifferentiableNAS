@@ -1,8 +1,4 @@
 using Test
 
-@testset "Unit test" begin
-    @test 1==1
-end
-
-
+include("CIFAR10.jl")
 include("DARTS_model_test.jl")

@@ -110,7 +110,7 @@ struct MixedOp
     ops
 end
 
-MixedOp(channels::Int64, stride::Int64) = MixedOp([OPS[prim](channels, stride, 1) for prim in PRIMITIVES])
+MixedOp(channels::Int64, stride::Int64) = MixedOp([OPS[prim](channels, stride, 1) for prim in PRIMITIVES]) |> gpu
 
 function (m::MixedOp)(x, αs)
     sum([op(x) for op in m.ops] .* αs)
@@ -203,6 +203,8 @@ function DARTSNetwork(α_normal, α_reduce; num_classes = 10, layers = 8, channe
 
     global_pooling = AdaptiveMeanPool((1,1)) |> gpu
     classifier = Dense(channels_last, num_classes) |> gpu
+    α_normal = α_normal |> gpu
+    α_reduce = α_reduce |> gpu
     DARTSModel(α_normal, α_reduce, stem, cells, global_pooling, classifier)
 end
 

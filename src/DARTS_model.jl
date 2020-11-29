@@ -14,7 +14,7 @@ ReLUConvBN(channels_in, channels_out, kernel_size, stride, pad) = Chain(
     x -> relu.(x),
     Conv(kernel_size, channels_in => channels_out),# ,pad=(pad,pad), stride=(stride,stride)),
     BatchNorm(channels_out),
-)
+)  |> gpu
 
 function FactorizedReduce(channels_in, channels_out, stride)
     odd = Conv((1, 1), channels_in => channels_out ÷ stride, stride = (stride, stride))
@@ -24,7 +24,7 @@ function FactorizedReduce(channels_in, channels_out, stride)
     x -> relu.(x),
     x -> cat(odd(x), even(x[2:end, 2:end, :, :]), dims = 3),
     BatchNorm(channels_out)
-    )
+    )  |> gpu
 end
 
 SepConv(channels_in, channels_out, kernel_size, stride, pad) = Chain(
@@ -36,7 +36,7 @@ SepConv(channels_in, channels_out, kernel_size, stride, pad) = Chain(
     DepthwiseConv(kernel_size, channels_in => channels_in, pad = (pad, pad), stride = (1, 1)),
     Conv((1, 1), channels_in => channels_out, stride = (1, 1), pad = (0, 0)),
     BatchNorm(channels_out),
-)
+) |> gpu
 
 DilConv(channels_in, channels_out, kernel_size, stride, pad, dilation) = Chain(
     x -> relu.(x),
@@ -49,10 +49,10 @@ DilConv(channels_in, channels_out, kernel_size, stride, pad, dilation) = Chain(
     ),
     Conv(kernel_size, channels_in => channels_out, stride = (1, 1), pad = (pad, pad)),
     BatchNorm(channels_out),
-)
+) |> gpu
 
-Identity(stride, pad) = x -> x[1:stride:end, 1:stride:end, :, :]
-Zero(stride, pad) = x -> x[1:stride:end, 1:stride:end, :, :] * 0
+Identity(stride, pad) = x -> x[1:stride:end, 1:stride:end, :, :] |> gpu
+Zero(stride, pad) = x -> x[1:stride:end, 1:stride:end, :, :] * 0 |> gpu
 
 SkipConnect(channels_in, channels_out, stride, pad) = stride == 1 ? Identity(stride, pad) : FactorizedReduce(channels_in, channels_out, stride)
 
@@ -65,46 +65,45 @@ AdaptiveMeanPool(target_out::NTuple{N,Integer}) where {N} = AdaptiveMeanPool(tar
 function (m::AdaptiveMeanPool)(x)
     w = size(x, 1) - m.target_out[1] + 1
     h = size(x, 2) - m.target_out[2] + 1
-    return meanpool(x, (w, h); pad = (0, 0), stride = (1, 1))
+    return meanpool(x, (w, h); pad = (0, 0), stride = (1, 1)) |> gpu
 end
 
 PRIMITIVES = [
-    none,
-    max_pool_3x3,
-    avg_pool_3x3,
-    skip_connect,
-    sep_conv_3x3,
-    sep_conv_5x5,
-    #sep_conv_7x7,
-    #dil_conv_3x3,
-    #dil_conv_5x5,
-    #conv_7x1_1x7
+    "none",
+    "max_pool_3x3",
+    "avg_pool_3x3",
+    "skip_connect",
+    "sep_conv_3x3",
+    "sep_conv_5x5",
+    #"sep_conv_7x7",
+    #"dil_conv_3x3",
+    #"dil_conv_5x5",
+    #"conv_7x1_1x7"
 ]
 
 #TODO: change to NamedTuple
-OPS = (
-    none = (channels, stride, w) -> Chain(Zero(stride, 1)),
-    #identity => (channels, stride, w) -> Chain(Identity(stride, 1)),
-    avg_pool_3x3 =
+OPS = Dict(
+    "none" => (channels, stride, w) -> Chain(Zero(stride, 1))  |> gpu,
+    "avg_pool_3x3" =>
         (channels, stride, w) ->
-            Chain(MeanPool((3, 3), stride = stride, pad = 1), BatchNorm(channels)) |> f32,
-    max_pool_3x3 =
+            Chain(MeanPool((3, 3), stride = stride, pad = 1), BatchNorm(channels)) |> gpu,
+    "max_pool_3x3" =>
         (channels, stride, w) ->
-            Chain(MaxPool((3, 3), stride = stride, pad = 1), BatchNorm(channels)),
-    skip_connect =
-        (channels, stride, w) -> Chain(SkipConnect(channels, channels, stride, 1)),
-    sep_conv_3x3 = (channels, stride, w) -> SepConv(channels, channels, (3, 3), stride, 1),
-    sep_conv_5x5 = (channels, stride, w)-> SepConv(channels, channels, (5, 5), stride, 2),
-    #sep_conv_7x7 => (channels, stride, w)-> SepConv(channels, channels, 7, stride, 3),
-    dil_conv_3x3 = (channels, stride, w) -> DilConv(channels, channels, (3, 3), stride, 1, 2),
-    dil_conv_5x5 = (channels, stride, w)-> DilConv(channels, channels, (5, 5), stride, 2, 2),
-    conv_7x1_1x7 =
+            Chain(MaxPool((3, 3), stride = stride, pad = 1), BatchNorm(channels))  |> gpu,
+    "skip_connect" =>
+        (channels, stride, w) -> Chain(SkipConnect(channels, channels, stride, 1))  |> gpu,
+    "sep_conv_3x3" => (channels, stride, w) -> SepConv(channels, channels, (3, 3), stride, 1) |> gpu,
+    "sep_conv_5x5" => (channels, stride, w)-> SepConv(channels, channels, (5, 5), stride, 2) |> gpu,
+    #"sep_conv_7x7" => (channels, stride, w)-> SepConv(channels, channels, 7, stride, 3)  |> gpu,
+    "dil_conv_3x3" => (channels, stride, w) -> DilConv(channels, channels, (3, 3), stride, 1, 2)  |> gpu,
+    "dil_conv_5x5" => (channels, stride, w)-> DilConv(channels, channels, (5, 5), stride, 2, 2)  |> gpu,
+    "conv_7x1_1x7" =>
         (channels, stride, w) -> Chain(
             x -> relu.(x),
             Conv((1, 7), C -> channels, pad = (0, 3), stride = (1, stride)),
             Conv((7, 1), C -> channels, pad = (3, 0), stride = (stride, 1)),
             BatchNorm(channels_out)
-        ),
+        ) |> gpu,
 )
 
 struct MixedOp
@@ -130,16 +129,16 @@ end
 
 function Cell(channels_before_last, channels_last, channels, reduce, reduce_previous, steps, multiplier)
     if reduce_previous
-        prelayer1 = FactorizedReduce(channels_before_last,channels,2)
+        prelayer1 = FactorizedReduce(channels_before_last,channels,2)  |> gpu
     else
-        prelayer1 = ReLUConvBN(channels_before_last,channels,(1,1),1,0)
+        prelayer1 = ReLUConvBN(channels_before_last,channels,(1,1),1,0)  |> gpu
     end
-    prelayer2 = ReLUConvBN(channels_last,channels,(1,1),1,0)
-    mixedops = []
+    prelayer2 = ReLUConvBN(channels_last,channels,(1,1),1,0)  |> gpu
+    mixedops = []  |> gpu
     for i = 0:steps-1
        for j = 0:2+i-1
             reduce && j < 2 ? stride = 2 : stride = 1
-            mixedop = MixedOp(channels, stride)
+            mixedop = MixedOp(channels, stride)  |> gpu
             push!(mixedops, mixedop)
         end
     end
@@ -194,7 +193,7 @@ function DARTSNetwork(α_normal, α_reduce; num_classes = 10, layers = 8, channe
         else
             reduce = false
         end
-        cell = Cell(channels_before_last, channels_last, channels_current, reduce, reduce_previous, steps, mult)
+        cell = Cell(channels_before_last, channels_last, channels_current, reduce, reduce_previous, steps, mult)  |> gpu
         push!(cells, cell)
 
         reduce_previous = reduce

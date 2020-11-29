@@ -113,7 +113,7 @@ end
 MixedOp(channels::Int64, stride::Int64) = MixedOp([OPS[prim](channels, stride, 1) for prim in PRIMITIVES]) |> gpu
 
 function (m::MixedOp)(x, αs)
-    sum([op(x) for op in m.ops] .* αs)
+    sum([op(x) for op in m.ops] .* αs) |> gpu
 end
 
 Flux.@functor MixedOp
@@ -142,7 +142,7 @@ function Cell(channels_before_last, channels_last, channels, reduce, reduce_prev
             push!(mixedops, mixedop)
         end
     end
-    Cell(steps, reduce, multiplier, prelayer1, prelayer2, mixedops)
+    Cell(steps, reduce, multiplier, prelayer1, prelayer2, mixedops) |> gpu
 end
 
 function (m::Cell)(x1, x2, αs)

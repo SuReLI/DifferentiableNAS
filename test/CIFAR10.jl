@@ -1,4 +1,3 @@
-#source: https://github.com/FluxML/model-zoo/blob/master/vision/cifar10/cifar10.jl
 using Metalhead, Images, Flux
 using Flux: onehotbatch
 using Base.Iterators: partition

@@ -7,8 +7,8 @@ include("CIFAR10.jl")
     mo = MixedOp(4,1)  |> gpu
     @test length(params(mo).order |> cpu) > 0
     input = rand(Float32,8,8,4,2)  |> gpu
-    @test size(input) == size(mo(input, rand(Float32,num_ops)))
     α = rand(Float32, num_ops)  |> gpu
+    @test size(input) == size(mo(input, α))
     @test size(input) == size(gradient(x -> sum(mo(x, α)), input)[1])
 end
 

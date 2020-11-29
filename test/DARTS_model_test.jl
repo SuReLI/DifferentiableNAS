@@ -60,11 +60,11 @@ end
     random_α(dim1::Int64, dim2::Int64) = singlify.(2e-3*(rand(Float32, dim1, dim2) .- 0.5))
     softmaxrandom_α(dim1::Int64,dim2::Int64) = singlify.(softmax(random_α(dim1, dim2), dims = 2))
     uniform_α(dim1::Int64, dim2::Int64) = singlify.(softmax(ones((dim1, dim2)), dims = 2))
-    α_normal = uniform_α(k, num_ops)
-    α_rand = softmax(random_α(k, num_ops), dims = 2)
-    @test all(y->y==α_normal[1], α_normal)
+    α_normal = uniform_α(k, num_ops) |> gpu
+    α_rand = softmax(random_α(k, num_ops), dims = 2) |> gpu
+    @test all(y->y==α_normal[1], α_normal |> cpu)
     α_reduce = uniform_α(k, num_ops)
-    @test all(y->y==α_normal[1], α_normal)
+    @test all(y->y==α_reduce[1], α_reduce |> cpu)
 
     m = DARTSNetwork(α_normal, α_reduce)  |> gpu
     @test length(params(m).order) > 1

@@ -69,36 +69,36 @@ function (m::AdaptiveMeanPool)(x)
 end
 
 PRIMITIVES = [
-    "none",
-    "max_pool_3x3",
-    "avg_pool_3x3",
-    "skip_connect",
-    "sep_conv_3x3",
-    "sep_conv_5x5",
-    #"sep_conv_7x7",
-    #"dil_conv_3x3",
-    #"dil_conv_5x5",
-    #"conv_7x1_1x7"
+    none,
+    max_pool_3x3,
+    avg_pool_3x3,
+    skip_connect,
+    sep_conv_3x3,
+    sep_conv_5x5,
+    #sep_conv_7x7,
+    #dil_conv_3x3,
+    #dil_conv_5x5,
+    #conv_7x1_1x7
 ]
 
 #TODO: change to NamedTuple
-OPS = Dict(
-    "none" => (channels, stride, w) -> Chain(Zero(stride, 1)),
-    #"identity" => (channels, stride, w) -> Chain(Identity(stride, 1)),
-    "avg_pool_3x3" =>
+OPS = (
+    none = (channels, stride, w) -> Chain(Zero(stride, 1)),
+    #identity => (channels, stride, w) -> Chain(Identity(stride, 1)),
+    avg_pool_3x3 =
         (channels, stride, w) ->
             Chain(MeanPool((3, 3), stride = stride, pad = 1), BatchNorm(channels)) |> f32,
-    "max_pool_3x3" =>
+    max_pool_3x3 =
         (channels, stride, w) ->
             Chain(MaxPool((3, 3), stride = stride, pad = 1), BatchNorm(channels)),
-    "skip_connect" =>
+    skip_connect =
         (channels, stride, w) -> Chain(SkipConnect(channels, channels, stride, 1)),
-    "sep_conv_3x3" => (channels, stride, w) -> SepConv(channels, channels, (3, 3), stride, 1),
-    "sep_conv_5x5" => (channels, stride, w)-> SepConv(channels, channels, (5, 5), stride, 2),
-    #"sep_conv_7x7" => (channels, stride, w)-> SepConv(channels, channels, 7, stride, 3),
-    "dil_conv_3x3" => (channels, stride, w) -> DilConv(channels, channels, (3, 3), stride, 1, 2),
-    "dil_conv_5x5" => (channels, stride, w)-> DilConv(channels, channels, (5, 5), stride, 2, 2),
-    "conv_7x1_1x7" =>
+    sep_conv_3x3 = (channels, stride, w) -> SepConv(channels, channels, (3, 3), stride, 1),
+    sep_conv_5x5 = (channels, stride, w)-> SepConv(channels, channels, (5, 5), stride, 2),
+    #sep_conv_7x7 => (channels, stride, w)-> SepConv(channels, channels, 7, stride, 3),
+    dil_conv_3x3 = (channels, stride, w) -> DilConv(channels, channels, (3, 3), stride, 1, 2),
+    dil_conv_5x5 = (channels, stride, w)-> DilConv(channels, channels, (5, 5), stride, 2, 2),
+    conv_7x1_1x7 =
         (channels, stride, w) -> Chain(
             x -> relu.(x),
             Conv((1, 7), C -> channels, pad = (0, 3), stride = (1, stride)),

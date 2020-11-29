@@ -46,8 +46,8 @@ function DARTStrain1st!(loss, model, train, val, opt; cb = () -> ())
     cb = runall(cb)
     #@progress
     for (train_batch, val_batch) in zip(train, val)
-        #gsα = grad_loss(model, α, val_batch)
-        #Flux.Optimise.update!(opt, α, gsα)
+        gsα = grad_loss(model, α, val_batch)
+        Flux.Optimise.update!(opt, α, gsα)
 
         gsw = grad_loss(model, w, train_batch)
         Flux.Optimise.update!(opt, w, gsw)

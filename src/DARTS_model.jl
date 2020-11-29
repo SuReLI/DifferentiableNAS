@@ -7,7 +7,7 @@ using Base.Iterators
 using StatsBase: mean
 using Zygote
 using LinearAlgebra
-# using CUDA
+using CUDA
 
 
 ReLUConvBN(channels_in, channels_out, kernel_size, stride, pad) = Chain(
@@ -181,12 +181,12 @@ function DARTSNetwork(α_normal, α_reduce; num_classes = 10, layers = 8, channe
     channels_current = channels*stem_mult
     stem = Chain(
         Conv((3,3), 3=>channels_current, pad=(1,1)),
-        BatchNorm(channels_current))
+        BatchNorm(channels_current)) |> gpu
     channels_before_last = channels_current
     channels_last = channels_current
     channels_current = channels
     reduce_previous = false
-    cells = []
+    cells = [] |> gpu
     for i = 1:layers
         if i == layers÷3+1 || i == 2*layers÷3+1
             channels_current = channels_current*2
@@ -202,8 +202,8 @@ function DARTSNetwork(α_normal, α_reduce; num_classes = 10, layers = 8, channe
         channels_last = mult*channels_current
     end
 
-    global_pooling = AdaptiveMeanPool((1,1))
-    classifier = Dense(channels_last, num_classes)
+    global_pooling = AdaptiveMeanPool((1,1)) |> gpu
+    classifier = Dense(channels_last, num_classes) |> gpu
     DARTSModel(α_normal, α_reduce, stem, cells, global_pooling, classifier)
 end
 

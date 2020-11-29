@@ -16,8 +16,8 @@ function get_test_data(get_proportion = 1.0)
         test = test[shuffle(1:length(test))[1:Int64(length(test)*get_proportion)]]
     end
     testimgs = [getarray(test[i].img) for i in 1:length(test)]
-    testY = onehotbatch([test[i].ground_truth.class for i in 1:length(test)], 1:10)# |> gpu
-    testX = cat(testimgs..., dims = 4)# |> gpu
+    testY = onehotbatch([test[i].ground_truth.class for i in 1:length(test)], 1:10) |> gpu
+    testX = cat(testimgs..., dims = 4) |> gpu
     test = (testX,testY)
     return test
 end
@@ -30,8 +30,8 @@ function get_processed_data(splitr = 0.5, batchsize = 64)
     labels = onehotbatch([X[i].ground_truth.class for i in 1:40000],1:10)
     train_pop = Int((1-splitr)* 40000)
     #train = gpu.([(cat(imgs[i]..., dims = 4), labels[:,i]) for i in partition(1:train_pop, batchsize)])
-    train = ([(cat(imgs[i]..., dims = 4), labels[:,i]) for i in partition(1:train_pop, batchsize)])
-    val = ([(cat(imgs[i]..., dims = 4), labels[:,i]) for i in partition(train_pop+1:40000, batchsize)])
+    train = gpu.([(cat(imgs[i]..., dims = 4), labels[:,i]) for i in partition(1:train_pop, batchsize)])
+    val = gpu.([(cat(imgs[i]..., dims = 4), labels[:,i]) for i in partition(train_pop+1:40000, batchsize)])
     return train, val
 end
 

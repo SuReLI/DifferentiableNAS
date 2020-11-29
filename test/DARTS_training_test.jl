@@ -13,11 +13,11 @@ include("CIFAR10.jl")
     random_α(dim1::Int64, dim2::Int64) = singlify.(2e-3*(rand(Float32, dim1, dim2) .- 0.5))
     softmaxrandom_α(dim1::Int64,dim2::Int64) = singlify.(softmax(random_α(dim1, dim2), dims = 2))
     uniform_α(dim1::Int64, dim2::Int64) = singlify.(softmax(ones((dim1, dim2)), dims = 2))
-    α_normal = uniform_α(k, num_ops)
-    α_rand = softmax(random_α(k, num_ops), dims = 2)
-    α_reduce = uniform_α(k, num_ops)
+    α_normal = uniform_α(k, num_ops)  |> gpu
+    α_rand = softmax(random_α(k, num_ops), dims = 2)  |> gpu
+    α_reduce = uniform_α(k, num_ops)  |> gpu
 
-    m = DARTSNetwork(α_normal, α_reduce)
+    m = DARTSNetwork(α_normal, α_reduce) |> gpu
     batchsize = 64
     throttle_ = 2
     splitr = 0.5

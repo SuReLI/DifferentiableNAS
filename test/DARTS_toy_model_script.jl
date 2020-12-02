@@ -1,5 +1,5 @@
 using DifferentiableNAS
-using Flux #: logitcrossentropy, ADAM, params, gradient, @epochs, onecold, throttle
+using Flux 
 using Flux: throttle, logitcrossentropy, ADAM, params, gradient, @epochs, onecold
 using StatsBase
 include("CIFAR10.jl")

@@ -1,14 +1,18 @@
 export DARTStrain1st!, DARTStrain2nd!, all_ws, all_αs
 
 using Flux
+using Flux: onehotbatch
 using Juno
 using Base.Iterators
 using StatsBase: mean
 using Zygote
+using Zygote: @nograd
 using LinearAlgebra
+using CUDA
 include("utils.jl")
 include("DARTS_model.jl")
-# using CUDA
+@nograd onehotbatch
+@nograd softmax
 
 function flatten_grads(grads)
     xs = Zygote.Buffer([])
@@ -46,11 +50,15 @@ function DARTStrain1st!(loss, model, train, val, opt; cb = () -> ())
     cb = runall(cb)
     #@progress
     for (train_batch, val_batch) in zip(train, val)
-        gsα = grad_loss(model, α, val_batch)
+        v_gpu = val_batch |> gpu
+        gsα = grad_loss(model, α, v_gpu)
         Flux.Optimise.update!(opt, α, gsα)
+        #CUDA.unsafe_free!(v_gpu[1])
 
-        gsw = grad_loss(model, w, train_batch)
+        t_gpu = train_batch |> gpu
+        gsw = grad_loss(model, w, t_gpu)
         Flux.Optimise.update!(opt, w, gsw)
+        #CUDA.unsafe_free!(t_gpu[1])
         cb()
     end
 end

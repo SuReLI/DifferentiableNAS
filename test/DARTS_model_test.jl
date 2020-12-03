@@ -49,4 +49,7 @@ end
     @test length(all_αs(m).order) == 2*k
     @test length(all_αs(m).order) + length(all_ws(m).order) == length(params(m).order)
     @test length(params(m.cells).order) > 1
+    test_image = rand(Float32, 32, 32, 3, 1) |> gpu
+    grad = gradient(x->sum(m(x)), test_image)
+    @test size(test_image) ==  size(grad)
 end

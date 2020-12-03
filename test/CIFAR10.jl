@@ -14,7 +14,7 @@ end
 function get_test_data(get_proportion = 1.0)
     # Fetch the test data from Metalhead and get it into proper shape.
     test = valimgs(CIFAR10)
-    if get_proportion < 1
+    if get_proportion < 1.0
         test = test[shuffle(1:length(test))[1:Int64(length(test)*get_proportion)]]
     end
     testimgs = [getarray(test[i].img) for i in 1:length(test)]

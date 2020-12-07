@@ -1,5 +1,6 @@
-DARTSEvalModelexport PRIMITIVES, uniform_α, DARTSModel
+export PRIMITIVES, uniform_α, DARTSModel
 export Cell, MixedOp, squeeze, all_αs
+
 
 using Flux
 using Base.Iterators
@@ -7,9 +8,6 @@ using StatsBase: mean
 using Zygote
 using LinearAlgebra
 using CUDA
-using JuliennedArrays
-using Zygote: @adjoint, _zero#, forward
-using SliceMap
 
 ReLUConvBN(channels_in, channels_out, kernel_size, stride, pad) = Chain(
     x -> relu.(x),
@@ -133,70 +131,16 @@ OPS = Dict(
 )
 
 struct MixedOp
-    location::Int64
     ops::AbstractArray
 end
 
-MixedOp(channels::Int64, stride::Int64, location::Int64) = MixedOp(location, [OPS[prim](channels, stride, 1) |> gpu for prim in PRIMITIVES]) |> gpu
-
-function mask(row::Int64, shape::AbstractArray)
-    m = zeros(Float32, size(shape)...)
-    m[row,:] .= 1
-    m |> gpu
-end
+MixedOp(channels::Int64, stride::Int64) = MixedOp([OPS[prim](channels, stride, 1) |> gpu for prim in PRIMITIVES]) |> gpu
 
 function (m::MixedOp)(x, αs)
     mapreduce((op, α) -> α*op(x), +, m.ops, αs)
-    #mapped = map(op -> op(x), m.ops)
-    #sum((mask(m.location, αs) .* αs) * mapped)
 end
 
 Flux.@functor MixedOp
-
-my_zero(xs::AbstractArray) = fill!(similar(xs), zero(eltype(xs)))
-
-collecteachrow(x) = collect(eachrow(x))
-
-@adjoint function collecteachrow(x)
-    collecteachrow(x), dy -> begin
-        dx = my_zero(x) # _zero is not in ZygoteRules, TODO
-        display((typeof(dy), typeof((dx,))))
-        foreach(copyto!, collecteachrow(dx), dy)
-        (dx,)
-    end
-end
-"""
-@adjoint function mapreduce(op, func, xs; kwargs...)
-    opbacks = Any[]
-    backs = Any[]
-    ys = Any[]
-    function nop(x)
-        y, back = pullback(op,x)
-        push!(opbacks, back)
-        y
-    end
-    function nfunc(x, x2)
-        y, back = pullback(func, x, x2)
-        push!(backs, back)
-        push!(ys, y)
-        return y
-    end
-    mapreduce(nop, nfunc, xs; kwargs...),
-    function (adjy)
-        offset = haskey(kwargs, :init) ? 0 : 1
-        res = Vector{Any}(undef, length(ys)+offset)
-        for i=length(ys):-1:1
-            opback, back, y = opbacks[i+offset], backs[i], ys[i]
-            adjy, adjthis = back(adjy)
-            res[i+offset], = opback(adjthis)
-        end
-        if offset==1
-            res[1], = opbacks[1](adjy)
-        end
-        return (nothing, nothing, res)
-    end
-end
-"""
 
 struct Cell
     steps::Int64
@@ -218,7 +162,7 @@ function Cell(channels_before_last, channels_last, channels, reduce, reduce_prev
     for i = 0:steps-1
        for j = 0:2+i-1
             reduce && j < 2 ? stride = 2 : stride = 1
-            mixedop = MixedOp(channels, stride, length(mixedops)+1)  |> gpu
+            mixedop = MixedOp(channels, stride)  |> gpu
             push!(mixedops, mixedop)
         end
     end
@@ -235,20 +179,19 @@ function (m::Cell)(x1, x2, αs)
     states[2] = state2
     offset = 0
     for step in 1:m.steps
-        state = mapreduce((mixedop, state, α) -> mixedop(state, α), +, m.mixedops[offset+1:offset+step+1], states, collecteachrow(αs[offset+1:offset+step+1]))
+        state = mapreduce((mixedop, state, α) -> mixedop(state, α), +, m.mixedops[offset+1:offset+step+1], states, αs)
         offset += step + 1
         states[step+2] = state
     end
     states_ = copy(states)
-    out = cat(states_[m.steps+2-m.multiplier+1:m.steps+2]..., dims = 3)
-    out
+    cat(states_[m.steps+2-m.multiplier+1:m.steps+2]..., dims = 3)
 end
 
 Flux.@functor Cell
 
 struct DARTSModel
-    normal_αs::AbstractArray
-    reduce_αs::AbstractArray
+    normal_αs::Tuple
+    reduce_αs::Tuple
     stem::Chain
     cells::AbstractArray
     global_pooling::AdaptiveMeanPool
@@ -291,7 +234,7 @@ function (m::DARTSModel)(x)
     s1 = m.stem(x)
     s2 = m.stem(x)
     for (i, cell) in enumerate(m.cells)
-        cell.reduction ? αs = softmax(m.reduce_αs, dims = 2) : αs = softmax(m.normal_αs, dims = 2)
+        cell.reduction ? αs = softmax.(m.reduce_αs) : αs = softmax.(m.normal_αs)
         new_state = cell(s1, s2, αs)
         s1 = s2
         s2 = new_state
@@ -301,28 +244,3 @@ function (m::DARTSModel)(x)
 end
 
 Flux.@functor DARTSModel
-
-struct DARTSEvalModel
-    normal_αs::AbstractArray
-    reduce_αs::AbstractArray
-    stem::Chain
-    cells::AbstractArray
-    global_pooling::AdaptiveMeanPool
-    classifier::Dense
-end
-
-function DARTSEvalModel(searchmodel::DARTSModel)
-
-end
-
-function (m::DARTSEvalModel)(x)
-    s1 = m.stem(x)
-    s2 = m.stem(x)
-    for (i, cell) in enumerate(m.cells)
-        new_state = cell(s1, s2)
-        s1 = s2
-        s2 = new_state
-    end
-    out = m.global_pooling(s2)
-    m.classifier(squeeze(out))
-end

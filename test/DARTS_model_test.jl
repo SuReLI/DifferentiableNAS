@@ -1,17 +1,24 @@
 using DifferentiableNAS
 using Flux
 using CUDA
+using SliceMap
+using Zygote: @showgrad
+using Zygote
 include("CIFAR10.jl")
 
 @testset "DARTS MixedOp" begin
+    steps = 4
+    k = floor(Int, steps^2/2+3*steps/2)
     num_ops = length(PRIMITIVES)
-    mo = MixedOp(4,1)  |> gpu
+    mo = MixedOp(4,1,1)  |> gpu
     @test length(params(mo).order |> cpu) > 0
     data = rand(Float32,8,8,4,2)  |> gpu
+    #α = rand(Float32, k, num_ops)  |> gpu
     α = rand(Float32, num_ops)  |> gpu
     println(typeof(mo.ops[1]),typeof(mo.ops))
     @test size(data) == size(mo(data, α))
-    @test size(data) == size(gradient(x -> sum(mo(x, α)), data)[1])
+    g = gradient(x -> sum(mo(x, α)), data)
+    @test size(data) == size(g[1])
 end
 
 @testset "DARTS Cell" begin
@@ -21,11 +28,12 @@ end
     data = rand(Float32,8,8,4,2) |> gpu
     cell = Cell(4, 4, 1, false, false, 4, 4) |> gpu
     @test length(params(cell).order) > 0
-    as = cu.([2e-3*rand(Float32, num_ops).-0.5 for _ in 1:k])
+    #as = cu.([2e-3*(rand(Float32, num_ops).-0.5) for _ in 1:k])
+    as = rand(Float32, k, num_ops) |> gpu
     @test size(data) == size(cell(data, data, as))
     grad = gradient((x1, x2, αs) -> sum(cell(x1, x2, αs)), data, data, as)
+    display(grad)
     @test size(data) == size(grad[1])
-
 end
 
 @testset "DARTS Model" begin
@@ -41,10 +49,11 @@ end
     α_normal = uniform_α(k, num_ops) |> gpu
     α_rand = softmax(random_α(k, num_ops), dims = 2) |> gpu
     α_reduce = uniform_α(k, num_ops) |> gpu
-    a_n = cu.([2e-3*rand(Float32, num_ops).-0.5 for _ in 1:k])
-    a_r = cu.([2e-3*rand(Float32, num_ops).-0.5 for _ in 1:k])
+    a_n = cu.([2e-3*(rand(Float32, num_ops).-0.5) for _ in 1:k])
+    a_r = cu.([2e-3*(rand(Float32, num_ops).-0.5) for _ in 1:k])
 
-    m = DARTSModel(a_n, a_r) |> gpu
+    #m = DARTSModel(a_n, a_r) |> gpu
+    m = DARTSModel(α_normal, α_reduce) |> gpu
     @test length(params(m).order) > 1
     @test length(all_αs(m).order) == 2*k
     @test length(all_αs(m).order) + length(all_ws(m).order) == length(params(m).order)

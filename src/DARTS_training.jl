@@ -34,7 +34,7 @@ end
 runall(f) = f
 runall(fs::AbstractVector) = () -> foreach(call, fs)
 
-all_αs(model::DARTSModel) = params([model.normal_αs..., model.reduce_αs...])
+all_αs(model::DARTSModel) = params([model.normal_αs, model.reduce_αs])
 all_ws(model::DARTSModel) = params([model.stem, model.cells..., model.global_pooling, model.classifier])
 
 function DARTStrain1st!(loss, model, train, val, opt; cb = () -> ())
@@ -52,21 +52,20 @@ function DARTStrain1st!(loss, model, train, val, opt; cb = () -> ())
     for (train_batch, val_batch) in zip(train, val)
         v_gpu = val_batch |> gpu
         gsα = grad_loss(model, α, v_gpu)
-        println(Flux.Optimise.apply!(opt, α, gsα))
         Flux.Optimise.update!(opt, α, gsα)
         #CUDA.unsafe_free!(v_gpu[1])
 
         t_gpu = train_batch |> gpu
         gsw = grad_loss(model, w, t_gpu)
-        println(Flux.Optimise.apply!(opt, w, gsw))
         Flux.Optimise.update!(opt, w, gsw)
         #CUDA.unsafe_free!(t_gpu[1])
+        cb()
     end
     cb()
 end
 
 
-function DARTStrain2nd!(loss, model, train, val, opt, order; cb = () -> ())
+function DARTStrain2nd!(loss, model, train, val, opt; cb = () -> ())
     function grad_loss(model, ps, batch, verbose = false)
         gs = gradient(ps) do
             loss(model, batch...)

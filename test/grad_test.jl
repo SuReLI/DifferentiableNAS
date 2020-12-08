@@ -1,7 +1,7 @@
 using Flux
 using LinearAlgebra
 
-p = [randn(5), randn(5)]
+p = [rand(5) for i=1:3]
 p1 = p[1]
 p2 = p[2]
 function myloss()
@@ -12,6 +12,15 @@ grad = gradient(Flux.Zygote.Params(p)) do
 end
 display(grad[p[1]])
 display(grad.grads)
+
+function myloss2()
+    norm(p[1]) + norm(p[2])
+end
+grad2 = gradient(Flux.params(p...)) do
+  myloss2()
+end
+display(grad2[p[1]])
+display(grad2.grads)
 
 function mysliceloss()
     norm(p[1]) + norm(p[2])
@@ -43,7 +52,7 @@ uniform_α(dim1::Int64, dim2::Int64) = singlify.(softmax(ones((dim1, dim2)), dim
 α_rand = softmax(random_α(k, num_ops), dims = 2) |> gpu
 α_reduce = random_α(k, num_ops) |> gpu
 
-m = DARTSModel(α_normal, α_reduce, layers = 3, channels = 4) |> gpu
+m = DARTSModel(num_cells = 3, channels = 4) |> gpu
 
 struct Αs
   αs

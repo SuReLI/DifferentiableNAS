@@ -12,12 +12,13 @@ steps = 4
 k = floor(Int, steps^2/2+3*steps/2)
 num_ops = length(PRIMITIVES)
 
-a_n = Tuple(cu.([2e-3*(rand(Float32, num_ops).-0.5) for _ in 1:k]))
-a_r = Tuple(cu.([2e-3*(rand(Float32, num_ops).-0.5) for _ in 1:k]))
+#a_n = Tuple(cu.([2e-3*(rand(Float32, num_ops).-0.5) for _ in 1:k]))
+#a_r = Tuple(cu.([2e-3*(rand(Float32, num_ops).-0.5) for _ in 1:k]))
 
-m = DARTSModel(a_n, a_r, layers = 3, channels = 4) |> gpu
+m = DARTSModel(num_cells = 3, channels = 4) |> gpu
 epochs = 50
-batchsize = 64
+#batchsize = 64
+batchsize = 32
 throttle_ = 20
 splitr = 0.5
 losscb() = @show(loss(m, test[1] |> gpu, test[2] |> gpu))
@@ -43,7 +44,9 @@ function accuracy_batched(m, xy)
     end
     score / batch
 end
-optimizer = ADAM(3e-4,(0.5,0.999))
+optimizer_α = ADAM(3e-4,(0.9,0.999))
+optimizer_w = Nesterov(0.025,0.9)
+
 
 train, val = get_processed_data(splitr, batchsize)
 test = get_test_data(0.01)
@@ -52,6 +55,7 @@ Base.@kwdef mutable struct α_histories
     normal_αs::Vector{NTuple{14,Array{Float32, 1}}}
     reduce_αs::Vector{NTuple{14,Array{Float32, 1}}}
 end
+
 
 function (hist::α_histories)()
     push!(hist.normal_αs, m.normal_αs |> cpu)
@@ -67,7 +71,7 @@ CbAll(cbs...) = CbAll(cbs)
 (cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
 cbs = CbAll(losscb, hist)
 
-Flux.@epochs 1 DARTStrain1st!(loss, m, train, val, optimizer; cb = cbs)
+Flux.@epochs 1 DARTStrain1st!(loss, m, train, val, optimizer_α, optimizer_w; cb = cbs)
 
 
 using Plots
@@ -82,3 +86,10 @@ for j = 1:8
     end
 end
 plot(p..., layout = (4,2), size = (600,1100))
+
+m_eval = DARTSEvalModel(m, num_cells=20, channels=36) |> gpu
+optimizer = Nesterov(3e-4,0.9)
+batchsize = 96
+train, _ = get_processed_data(0.0, batchsize)
+epochs = 600
+Flux.@epochs 1 DARTSevaltrain1st!(loss, m, train, optimizer; cb = cbs)

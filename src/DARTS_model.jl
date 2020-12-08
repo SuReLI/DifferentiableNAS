@@ -1,5 +1,4 @@
-DARTSEvalModelexport PRIMITIVES, uniform_α, DARTSModel
-export Cell, MixedOp, squeeze, all_αs
+export PRIMITIVES, uniform_α, DARTSModel, Cell, MixedOp, squeeze, all_αs, DARTSEvalModel
 
 using Flux
 using Base.Iterators
@@ -8,8 +7,9 @@ using Zygote
 using LinearAlgebra
 using CUDA
 using JuliennedArrays
-using Zygote: @adjoint, _zero#, forward
+using Zygote: @adjoint, _zero
 using SliceMap
+
 
 ReLUConvBN(channels_in, channels_out, kernel_size, stride, pad) = Chain(
     x -> relu.(x),
@@ -142,7 +142,7 @@ MixedOp(channels::Int64, stride::Int64, location::Int64) = MixedOp(location, [OP
 function mask(row::Int64, shape::AbstractArray)
     m = zeros(Float32, size(shape)...)
     m[row,:] .= 1
-    m |> gpu
+    m
 end
 
 function (m::MixedOp)(x, αs)
@@ -160,11 +160,11 @@ collecteachrow(x) = collect(eachrow(x))
 @adjoint function collecteachrow(x)
     collecteachrow(x), dy -> begin
         dx = my_zero(x) # _zero is not in ZygoteRules, TODO
-        display((typeof(dy), typeof((dx,))))
         foreach(copyto!, collecteachrow(dx), dy)
         (dx,)
     end
 end
+
 """
 @adjoint function mapreduce(op, func, xs; kwargs...)
     opbacks = Any[]
@@ -209,16 +209,16 @@ end
 
 function Cell(channels_before_last, channels_last, channels, reduce, reduce_previous, steps, multiplier)
     if reduce_previous
-        prelayer1 = FactorizedReduce(channels_before_last,channels,2)  |> gpu
+        prelayer1 = FactorizedReduce(channels_before_last,channels,2) |> gpu
     else
-        prelayer1 = ReLUConvBN(channels_before_last,channels,(1,1),1,0)  |> gpu
+        prelayer1 = ReLUConvBN(channels_before_last,channels,(1,1),1,0) |> gpu
     end
-    prelayer2 = ReLUConvBN(channels_last,channels,(1,1),1,0)  |> gpu
-    mixedops = []  |> gpu
+    prelayer2 = ReLUConvBN(channels_last,channels,(1,1),1,0) |> gpu
+    mixedops = []
     for i = 0:steps-1
        for j = 0:2+i-1
             reduce && j < 2 ? stride = 2 : stride = 1
-            mixedop = MixedOp(channels, stride, length(mixedops)+1)  |> gpu
+            mixedop = MixedOp(channels, stride, length(mixedops)+1) |> gpu
             push!(mixedops, mixedop)
         end
     end
@@ -234,14 +234,23 @@ function (m::Cell)(x1, x2, αs)
     states[1] = state1
     states[2] = state2
     offset = 0
+    #mo_α = collect(zip(m.mixedops, collect(eachrow(αs))))
     for step in 1:m.steps
-        state = mapreduce((mixedop, state, α) -> mixedop(state, α), +, m.mixedops[offset+1:offset+step+1], states, collecteachrow(αs[offset+1:offset+step+1]))
+        #state = mapreduce((mixedop, α, state) -> mixedop(state, α), +, m.mixedops[offset+1:offset+step+1], collecteachrow(αs)[offset+1:offset+step+1], states)
+        #state = mapreduce(((mixedop, α), state) -> mixedop(state, α), +, mo_α[offset+1:offset+step+1], states)
+        #state = mapreduce((mixedop, α, previous_state) -> mixedop(previous_state, α), +, m.mixedops[offset+1:offset+step+1], αs[offset+1:offset+step+1], states)
+        to_sum = Zygote.Buffer([state1], step+1)
+        for i in 1:step+1
+            mo = m.mixedops[offset+i]
+            α = αs[offset+i]
+            state = states[i]
+            to_sum[i] = mo(state,α)
+        end
         offset += step + 1
-        states[step+2] = state
+        states[step+2] = sum(to_sum)
     end
     states_ = copy(states)
-    out = cat(states_[m.steps+2-m.multiplier+1:m.steps+2]..., dims = 3)
-    out
+    cat(states_[m.steps+2-m.multiplier+1:m.steps+2]..., dims = 3)
 end
 
 Flux.@functor Cell
@@ -255,7 +264,7 @@ struct DARTSModel
     classifier::Dense
 end
 
-function DARTSModel(α_normal, α_reduce; num_classes = 10, layers = 8, channels = 16, steps = 4, mult = 4 , stem_mult = 3)
+function DARTSModel(; num_classes = 10, num_cells = 8, channels = 16, steps = 4, mult = 4 , stem_mult = 3)
     channels_current = channels*stem_mult
     stem = Chain(
         Conv((3,3), 3=>channels_current, pad=(1,1)),
@@ -264,15 +273,15 @@ function DARTSModel(α_normal, α_reduce; num_classes = 10, layers = 8, channels
     channels_last = channels_current
     channels_current = channels
     reduce_previous = false
-    cells = [] |> gpu
-    for i = 1:layers
-        if i == layers÷3+1 || i == 2*layers÷3+1
+    cells = []
+    for i = 1:num_cells
+        if i == num_cells÷3+1 || i == 2*num_cells÷3+1
             channels_current = channels_current*2
             reduce = true
         else
             reduce = false
         end
-        cell = Cell(channels_before_last, channels_last, channels_current, reduce, reduce_previous, steps, mult)  |> gpu
+        cell = Cell(channels_before_last, channels_last, channels_current, reduce, reduce_previous, steps, mult) |> gpu
         push!(cells, cell)
 
         reduce_previous = reduce
@@ -282,8 +291,11 @@ function DARTSModel(α_normal, α_reduce; num_classes = 10, layers = 8, channels
 
     global_pooling = AdaptiveMeanPool((1,1)) |> gpu
     classifier = Dense(channels_last, num_classes) |> gpu
-    α_normal = α_normal |> gpu
-    α_reduce = α_reduce |> gpu
+    k = floor(Int, steps^2/2+3*steps/2)
+    α_normal = [rand(Float32, length(PRIMITIVES)) |> gpu for _ in 1:k]
+    α_reduce = [rand(Float32, length(PRIMITIVES)) |> gpu for _ in 1:k]
+    #α_normal = rand(Float32, length(PRIMITIVES), k)
+    #α_reduce = rand(Float32, length(PRIMITIVES), k)
     DARTSModel(α_normal, α_reduce, stem, cells, global_pooling, classifier)
 end
 
@@ -291,7 +303,8 @@ function (m::DARTSModel)(x)
     s1 = m.stem(x)
     s2 = m.stem(x)
     for (i, cell) in enumerate(m.cells)
-        cell.reduction ? αs = softmax(m.reduce_αs, dims = 2) : αs = softmax(m.normal_αs, dims = 2)
+        #cell.reduction ? αs = softmax(m.reduce_αs, dims = 1) : αs = softmax(m.normal_αs, dims = 1)
+        cell.reduction ? αs = softmax.(m.reduce_αs) : αs = softmax.(m.normal_αs)
         new_state = cell(s1, s2, αs)
         s1 = s2
         s2 = new_state
@@ -302,6 +315,54 @@ end
 
 Flux.@functor DARTSModel
 
+
+struct EvalCell
+    steps::Int64
+    reduction::Bool
+    multiplier::Int64
+    prelayer1::Chain
+    prelayer2::Chain
+    ops::AbstractArray
+end
+
+function EvalCell(channels_before_last, channels_last, channels, reduce, reduce_previous, steps, multiplier, all_αs)
+    if reduce_previous
+        prelayer1 = FactorizedReduce(channels_before_last,channels,2)
+    else
+        prelayer1 = ReLUConvBN(channels_before_last,channels,(1,1),1,0)
+    end
+    prelayer2 = ReLUConvBN(channels_last,channels,(1,1),1,0)
+    ops = []
+    for i = 0:steps-1
+       for j = 0:2+i-1
+            reduce && j < 2 ? stride = 2 : stride = 1
+            op = OPS[PRIMITIVES[argmax(all_αs[length(ops)+1,:])]](channels, stride, 1)
+            push!(ops, op)
+        end
+    end
+    EvalCell(steps, reduce, multiplier, prelayer1, prelayer2, ops)
+end
+
+function (m::EvalCell)(x1, x2)
+    state1 = m.prelayer1(x1)
+    state2 = m.prelayer2(x2)
+
+    states = Zygote.Buffer([state1], m.steps+2)
+
+    states[1] = state1
+    states[2] = state2
+    offset = 0
+    for step in 1:m.steps
+        state = mapreduce((op, state) -> op(state), +, m.mixedops[offset+1:offset+step+1], states)
+        offset += step + 1
+        states[step+2] = state
+    end
+    states_ = copy(states)
+    cat(states_[m.steps+2-m.multiplier+1:m.steps+2]..., dims = 3)
+end
+
+Flux.@functor EvalCell
+
 struct DARTSEvalModel
     normal_αs::AbstractArray
     reduce_αs::AbstractArray
@@ -311,8 +372,38 @@ struct DARTSEvalModel
     classifier::Dense
 end
 
-function DARTSEvalModel(searchmodel::DARTSModel)
+function DARTSEvalModel(searchmodel::DARTSModel; num_cells = 8, channels = 16, num_classes = 10, steps = 4, mult = 4 , stem_mult = 3)
+    α_normal = searchmodel.normal_αs
+    α_reduce = searchmodel.reduce_αs
+    channels_current = channels*stem_mult
+    stem = Chain(
+        Conv((3,3), 3=>channels_current, pad=(1,1)),
+        BatchNorm(channels_current))
+    channels_before_last = channels_current
+    channels_last = channels_current
+    channels_current = channels
+    reduce_previous = false
+    cells = []
+    for i = 1:num_cells
+        if i == num_cells÷3+1 || i == 2*num_cells÷3+1
+            channels_current = channels_current*2
+            reduce = true
+            all_αs = α_reduce
+        else
+            reduce = false
+            all_αs = α_normal
+        end
+        cell = EvalCell(channels_before_last, channels_last, channels_current, reduce, reduce_previous, steps, mult, all_αs)
+        push!(cells, cell)
 
+        reduce_previous = reduce
+        channels_before_last = channels_last
+        channels_last = mult*channels_current
+    end
+
+    global_pooling = AdaptiveMeanPool((1,1))
+    classifier = Dense(channels_last, num_classes)
+    DARTSEvalModel(α_normal, α_reduce, stem, cells, global_pooling, classifier)
 end
 
 function (m::DARTSEvalModel)(x)
@@ -326,3 +417,5 @@ function (m::DARTSEvalModel)(x)
     out = m.global_pooling(s2)
     m.classifier(squeeze(out))
 end
+
+Flux.@functor DARTSEvalModel

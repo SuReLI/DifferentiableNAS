@@ -87,9 +87,10 @@ for j = 1:8
 end
 plot(p..., layout = (4,2), size = (600,1100))
 
+#need to clear GPU first
 m_eval = DARTSEvalModel(m, num_cells=20, channels=36) |> gpu
 optimizer = Nesterov(3e-4,0.9)
 batchsize = 96
 train, _ = get_processed_data(0.0, batchsize)
 epochs = 600
-Flux.@epochs 1 DARTSevaltrain1st!(loss, m, train, optimizer; cb = cbs)
+Flux.@epochs 1 DARTSevaltrain1st!(loss, m_eval, train, optimizer; cb = CbAll(losscb))

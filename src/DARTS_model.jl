@@ -353,7 +353,7 @@ function (m::EvalCell)(x1, x2)
     states[2] = state2
     offset = 0
     for step in 1:m.steps
-        state = mapreduce((op, state) -> op(state), +, m.mixedops[offset+1:offset+step+1], states)
+        state = mapreduce((op, state) -> op(state), +, m.ops[offset+1:offset+step+1], states)
         offset += step + 1
         states[step+2] = state
     end

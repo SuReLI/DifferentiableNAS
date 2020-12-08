@@ -137,6 +137,8 @@ function DARTStrain2nd!(loss, model, train, val, opt; cb = () -> ())
     end
 end
 
+all_ws(model::DARTSEvalModel) = params([model.stem, model.cells..., model.global_pooling, model.classifier])
+
 function DARTSevaltrain1st!(loss, model, train, opt_w; cb = () -> ())
     function grad_loss(model, ps, batch, verbose = false)
         gs = gradient(ps) do

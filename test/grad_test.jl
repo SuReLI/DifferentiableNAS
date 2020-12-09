@@ -1,7 +1,7 @@
 using Flux
 using LinearAlgebra
 
-p = [rand(5) for i=1:3]
+p = Tuple([rand(5) for i=1:3])
 p1 = p[1]
 p2 = p[2]
 function myloss()
@@ -16,20 +16,35 @@ display(grad.grads)
 function myloss2()
     norm(p[1]) + norm(p[2])
 end
-grad2 = gradient(Flux.params(p...)) do
+grad2 = gradient(Flux.params(p)) do
   myloss2()
 end
 display(grad2[p[1]])
 display(grad2.grads)
 
-function mysliceloss()
-    norm(p[1]) + norm(p[2])
+p = rand(5,3)
+p1 = p[:,1]
+p2 = p[:,2]
+function myloss()
+    norm(p1) + norm(p2)
 end
-gradslice = gradient(Flux.Zygote.Params(p)) do
-  mysliceloss()
+grad = gradient(Flux.Zygote.Params(p)) do
+  myloss()
 end
-display(gradslice[p[1]])
-display([k for k in keys(gradslice.grads)])
+display(grad.grads)
+
+function myloss2()
+    norm(p[:,1]) + norm(p[:,2])
+end
+grad2 = gradient(Flux.params(p...)) do
+  myloss2()
+end
+display(grad2.grads)
+for v in values(grad.grads)
+  if isa(v,AbstractArray) && size(p1) == size(v)
+    display(v)
+  end
+end
 
 using SliceMap
 using JuliennedArrays

@@ -1,4 +1,4 @@
-export squeeze, all_ws, all_αs
+export squeeze
 
 function squeeze(A::AbstractArray) #generalize this? move to utils?
     if ndims(A) == 3

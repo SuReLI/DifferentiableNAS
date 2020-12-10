@@ -15,8 +15,9 @@ include("CIFAR10.jl")
     data = rand(Float32,8,8,4,2)  |> gpu
     α = rand(Float32, num_ops)  |> gpu
     @test size(data) == size(mo(data, α))
-    g = gradient(x -> sum(mo(x, α)), data)
+    g = gradient((x,α) -> sum(mo(x, α)), data, α)
     @test size(data) == size(g[1])
+    @test size(α) == size(g[2])
 end
 
 @testset "DARTS Cell" begin
@@ -26,12 +27,13 @@ end
     data = rand(Float32,8,8,4,2) |> gpu
     cell = Cell(4, 4, 1, false, false, 4, 4) |> gpu
     @test length(params(cell).order) > 0
-    as = α14()
-    #as = [2e-3*(rand(Float32, num_ops).-0.5) |> gpu |> f32 for _ in 1:k]
+    #as = α14()
+    as = [2e-3*(rand(Float32, num_ops).-0.5) |> gpu |> f32 for _ in 1:k]
     #as = rand(Float32, k, num_ops) #|> gpu
     @test size(data) == size(cell(data, data, as))
     grad = gradient((x1, x2, αs) -> sum(cell(x1, x2, αs)), data, data, as)
     @test size(data) == size(grad[1])
+    display(typeof(grad[3]))
 end
 
 @testset "DARTS Model" begin

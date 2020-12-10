@@ -12,18 +12,8 @@ include("CIFAR10.jl")
     steps = 4
     k = floor(Int, steps^2/2+3*steps/2)
     num_ops = length(PRIMITIVES)
-    singlify(x::Float64) = Float32(x)
-    singlify(x::Complex{Float64}) = Complex{Float32}(x)
-    random_α(dim1::Int64, dim2::Int64) = singlify.(2e-3*(rand(Float32, dim1, dim2) .- 0.5))
-    softmaxrandom_α(dim1::Int64,dim2::Int64) = singlify.(softmax(random_α(dim1, dim2), dims = 2))
-    uniform_α(dim1::Int64, dim2::Int64) = singlify.(softmax(ones((dim1, dim2)), dims = 2))
-    α_normal = uniform_α(k, num_ops)  |> gpu
-    α_rand = softmax(random_α(k, num_ops), dims = 2)  |> gpu
-    α_reduce = uniform_α(k, num_ops)  |> gpu
-    a_n = cu.([2e-3*(rand(Float32, num_ops).-0.5) for _ in 1:k])
-    a_r = cu.([2e-3*(rand(Float32, num_ops).-0.5) for _ in 1:k])
 
-    m = DARTSModel(a_n, a_r) |> gpu
+    m = DARTSModel() |> gpu
     batchsize = 64
     throttle_ = 2
     splitr = 0.5

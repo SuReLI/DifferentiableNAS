@@ -146,7 +146,7 @@ function mask(row::Int64, shape::AbstractArray)
 end
 
 function (m::MixedOp)(x, αs)
-    mapreduce((op, α) -> α*op(x), +, m.ops, softmax(αs))
+    mapreduce((op, α) -> (α/sum(αs))*op(x), +, m.ops, αs)
     #mapped = map(op -> op(x), m.ops)
     #sum((mask(m.location, αs) .* αs) * mapped)
 end
@@ -233,27 +233,29 @@ function (m::Cell)(x1, x2, αs)
 
     states[1] = state1
     states[2] = state2
-    states[3] = m.mixedops[1](states[1],αs.α1) + m.mixedops[2](states[2],αs.α2)
-    states[4] = m.mixedops[3](states[1],αs.α3) + m.mixedops[4](states[2],αs.α4) + m.mixedops[5](states[3],αs.α5)
-    states[5] = m.mixedops[6](states[1],αs.α6) + m.mixedops[7](states[2],αs.α7) + m.mixedops[8](states[3],αs.α8) + m.mixedops[9](states[4],αs.α9)
-    states[6] = m.mixedops[10](states[1],αs.α10) + m.mixedops[11](states[2],αs.α11) + m.mixedops[12](states[3],αs.α12) + m.mixedops[13](states[4],αs.α13) + m.mixedops[14](states[5],αs.α14)
-    # offset = 0
-    # #mo_α = collect(zip(m.mixedops, collect(eachrow(αs))))
-    # for step in 1:m.steps
-    #     #state = mapreduce((mixedop, α, state) -> mixedop(state, α), +, m.mixedops[offset+1:offset+step+1], collecteachrow(αs)[offset+1:offset+step+1], states)
-    #     #state = mapreduce(((mixedop, α), state) -> mixedop(state, α), +, mo_α[offset+1:offset+step+1], states)
-    #     #state = mapreduce((mixedop, α, previous_state) -> mixedop(previous_state, α), +, m.mixedops[offset+1:offset+step+1], αs[offset+1:offset+step+1], states)
-    #     to_sum = Zygote.Buffer([state1], step+1)
-    #     for i in 1:step+1
-    #         mo = m.mixedops[offset+i]
-    #         α = αs[offset+i]
-    #         #α = getfield(αs,offset+i)
-    #         state = states[i]
-    #         to_sum[i] = mo(state,α)
-    #     end
-    #     offset += step + 1
-    #     states[step+2] = sum(to_sum)
-    # end
+    # states[3] = m.mixedops[1](states[1],αs.α1) + m.mixedops[2](states[2],αs.α2)
+    # states[4] = m.mixedops[3](states[1],αs.α3) + m.mixedops[4](states[2],αs.α4) + m.mixedops[5](states[3],αs.α5)
+    # states[5] = m.mixedops[6](states[1],αs.α6) + m.mixedops[7](states[2],αs.α7) + m.mixedops[8](states[3],αs.α8) + m.mixedops[9](states[4],αs.α9)
+    # states[6] = m.mixedops[10](states[1],αs.α10) + m.mixedops[11](states[2],αs.α11) + m.mixedops[12](states[3],αs.α12) + m.mixedops[13](states[4],αs.α13) + m.mixedops[14](states[5],αs.α14)
+    #
+    offset = 0
+    #mo_α = collect(zip(m.mixedops, collect(eachrow(αs))))
+    for step in 1:m.steps
+        #state = mapreduce((mixedop, α, state) -> mixedop(state, α), +, m.mixedops[offset+1:offset+step+1], collecteachrow(αs)[offset+1:offset+step+1], states)
+        #state = mapreduce(((mixedop, α), state) -> mixedop(state, α), +, mo_α[offset+1:offset+step+1], states)
+        state = mapreduce((mixedop, α, previous_state) -> mixedop(previous_state, α), +, m.mixedops[offset+1:offset+step+1], αs[offset+1:offset+step+1], states)
+        # to_sum = Zygote.Buffer([state1], step+1)
+        # for i in 1:step+1
+        #     mo = m.mixedops[offset+i]
+        #     α = αs[offset+i]
+        #     #α = getfield(αs,offset+i)
+        #     state = states[i]
+        #     to_sum[i] = mo(state,α)
+        # end
+        offset += step + 1
+        #states[step+2] = sum(to_sum)
+        states[step+2] = state
+    end
     states_ = copy(states)
     cat(states_[m.steps+2-m.multiplier+1:m.steps+2]..., dims = 3)
 end
@@ -282,8 +284,8 @@ end
 Flux.@functor α14
 
 struct DARTSModel
-    normal_αs::α14
-    reduce_αs::α14
+    normal_αs::AbstractArray
+    reduce_αs::AbstractArray
     stem::Chain
     cells::AbstractArray
     global_pooling::AdaptiveMeanPool
@@ -318,10 +320,10 @@ function DARTSModel(; num_classes = 10, num_cells = 8, channels = 16, steps = 4,
     global_pooling = AdaptiveMeanPool((1,1)) |> gpu
     classifier = Dense(channels_last, num_classes) |> gpu
     k = floor(Int, steps^2/2+3*steps/2)
-    α_normal = α14()
-    α_reduce = α14()
-    #α_normal = [rand(Float32, length(PRIMITIVES)) |> gpu |> f32 for _ in 1:k]
-    #α_reduce = [rand(Float32, length(PRIMITIVES)) |> gpu |> f32 for _ in 1:k]
+    #α_normal = α14()
+    #α_reduce = α14()
+    α_normal = [rand(Float32, length(PRIMITIVES)) |> gpu |> f32 for _ in 1:k]
+    α_reduce = [rand(Float32, length(PRIMITIVES)) |> gpu |> f32 for _ in 1:k]
     #α_normal = rand(Float32, length(PRIMITIVES), k)
     #α_reduce = rand(Float32, length(PRIMITIVES), k)
     DARTSModel(α_normal, α_reduce, stem, cells, global_pooling, classifier)

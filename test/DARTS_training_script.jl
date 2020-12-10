@@ -12,9 +12,6 @@ steps = 4
 k = floor(Int, steps^2/2+3*steps/2)
 num_ops = length(PRIMITIVES)
 
-#a_n = Tuple(cu.([2e-3*(rand(Float32, num_ops).-0.5) for _ in 1:k]))
-#a_r = Tuple(cu.([2e-3*(rand(Float32, num_ops).-0.5) for _ in 1:k]))
-
 m = DARTSModel(num_cells = 3, channels = 4) |> gpu
 epochs = 50
 #batchsize = 64
@@ -52,8 +49,8 @@ train, val = get_processed_data(splitr, batchsize)
 test = get_test_data(0.01)
 
 Base.@kwdef mutable struct α_histories
-    normal_αs::Vector{NTuple{14,Array{Float32, 1}}}
-    reduce_αs::Vector{NTuple{14,Array{Float32, 1}}}
+    normal_αs::Vector{Vector{Array{Float32, 1}}}
+    reduce_αs::Vector{Vector{Array{Float32, 1}}}
 end
 
 

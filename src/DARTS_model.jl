@@ -279,7 +279,7 @@ struct α14
     α14::AbstractArray
 end
 
-α14() = α14([[2e-3*(rand(length(PRIMITIVES)).-0.5) |> f32 |> gpu  for _ in 1:14]...)
+α14() = α14([2e-3*(rand(length(PRIMITIVES)).-0.5) |> f32 |> gpu  for _ in 1:14]...)
 
 Flux.@functor α14
 

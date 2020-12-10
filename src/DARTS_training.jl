@@ -50,9 +50,9 @@ function DARTStrain1st!(loss, model, train, val, opt_α, opt_w; cb = () -> ())
     #cb = runall(cb)
     #@progress
     for (train_batch, val_batch) in zip(train, val)
-        #v_gpu = val_batch |> gpu
-        #gsα = grad_loss(model, α, v_gpu)
-        #Flux.Optimise.update!(opt_α, α, gsα)
+        v_gpu = val_batch |> gpu
+        gsα = grad_loss(model, α, v_gpu)
+        Flux.Optimise.update!(opt_α, α, gsα)
         #CUDA.unsafe_free!(v_gpu[1])
 
         t_gpu = train_batch |> gpu

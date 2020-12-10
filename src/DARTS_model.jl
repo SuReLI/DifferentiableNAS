@@ -279,7 +279,7 @@ struct α14
     α14::AbstractArray
 end
 
-α14() = α14([2e-3*(rand(Float32, length(PRIMITIVES)).-0.5) |> gpu |> f32 for _ in 1:14]...)
+α14() = α14([[2e-3*(rand(length(PRIMITIVES)).-0.5) |> f32 |> gpu  for _ in 1:14]...)
 
 Flux.@functor α14
 
@@ -322,8 +322,9 @@ function DARTSModel(; num_classes = 10, num_cells = 8, channels = 16, steps = 4,
     k = floor(Int, steps^2/2+3*steps/2)
     #α_normal = α14()
     #α_reduce = α14()
-    α_normal = [rand(Float32, length(PRIMITIVES)) |> gpu |> f32 for _ in 1:k]
-    α_reduce = [rand(Float32, length(PRIMITIVES)) |> gpu |> f32 for _ in 1:k]
+    num_ops = length(PRIMITIVES)
+    α_normal = [2e-3*(rand(num_ops).-0.5) |> f32 |> gpu  for _ in 1:k]
+    α_reduce = [2e-3*(rand(num_ops).-0.5) |> f32 |> gpu  for _ in 1:k]
     #α_normal = rand(Float32, length(PRIMITIVES), k)
     #α_reduce = rand(Float32, length(PRIMITIVES), k)
     DARTSModel(α_normal, α_reduce, stem, cells, global_pooling, classifier)

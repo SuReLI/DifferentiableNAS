@@ -1,4 +1,4 @@
-export DARTStrain1st!, DARTStrain2nd!, all_ws, all_αs
+export Maskedtrain1st!
 
 using Flux
 using Flux: onehotbatch
@@ -34,10 +34,21 @@ end
 runall(f) = f
 runall(fs::AbstractVector) = () -> foreach(call, fs)
 
-all_αs(model::DARTSModel) = params([model.normal_αs, model.reduce_αs])
-all_ws(model::DARTSModel) = params([model.stem, model.cells..., model.global_pooling, model.classifier])
+all_ws(model::DARTSModel) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
 
-function Maskedtrain1st!(loss, model, train, val, opt; cb = () -> ())
+function perturb(αs::AbstractArray)
+    row = rand(1:length(αs))
+    inds = findall(αs[row] .> 0)
+    perturbs = [copy(αs) for i in inds]
+    for i in 1:length(inds)
+        perturbs[i] = deepcopy(αs)
+        perturbs[i][row][inds[i]] = 0.0
+    end
+    #display(inds)
+    (row, inds, perturbs)
+end
+
+function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cb = () -> ())
     function grad_loss(model, ps, batch, verbose = false)
         gs = gradient(ps) do
             loss(model, batch...)
@@ -45,28 +56,24 @@ function Maskedtrain1st!(loss, model, train, val, opt; cb = () -> ())
     end
 
     w = all_ws(model)
-    α = all_αs(model)
 
-    #cb = runall(cb)
-    #@progress
-    for (train_batch, val_batch) in zip(train, val)
-        v_gpu = val_batch |> gpu
-        gsα = grad_loss(model, α, v_gpu)
-        Flux.Optimise.update!(opt, α, gsα)
-        #CUDA.unsafe_free!(v_gpu[1])
-
+    for train_batch in train
         t_gpu = train_batch |> gpu
         gsw = grad_loss(model, w, t_gpu)
         Flux.Optimise.update!(opt, w, gsw)
-        #CUDA.unsafe_free!(t_gpu[1])
-        cb()
+        #cb()
     end
+
+    row, inds, perturbs = perturb(model.normal_αs)
+    vals = [accuracy(model, val, pert = pert) for pert in perturbs]
+    model.normal_αs[row][findmax(vals)[2]] = 0
+
     cb()
 end
 
 
 function MaskedEval(model, test, accuracy; cb = () -> ())
-    for batch in test:
+    for batch in test
         cb()
     end
 end

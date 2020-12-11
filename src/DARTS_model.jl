@@ -1,4 +1,4 @@
-export PRIMITIVES, uniform_α, DARTSModel, Cell, MixedOp, DARTSEvalModel, α14
+export PRIMITIVES, uniform_α, DARTSModel, Cell, MixedOp, DARTSEvalModel, α14, MaskedDARTSModel
 
 using Flux
 using Base.Iterators
@@ -132,6 +132,31 @@ OPS = Dict(
         ) |> gpu,
 )
 
+
+struct ParOp
+    ops::AbstractArray
+end
+
+ParOp(channels::Int64, stride::Int64) = ParOp([OPS[prim](channels, stride, 1) |> gpu for prim in PRIMITIVES]) |> gpu
+
+function mask(row::Int64, shape::AbstractArray)
+    m = zeros(Float32, size(shape)...)
+    m[row,:] .= 1
+    m
+end
+
+function (m::ParOp)(x, αs)
+    opouts = [op(x) for op in m.ops]
+    #return
+    #mapreduce((op, α) -> (α/sum(αs))*op(x), +, m.ops, αs)
+    #mapped = map(op -> op(x), m.ops)
+    #sum((mask(m.location, αs) .* αs) * mapped)
+end
+
+Flux.@functor ParOp
+
+
+
 struct MixedOp
     location::Int64
     ops::AbstractArray
@@ -146,6 +171,8 @@ function mask(row::Int64, shape::AbstractArray)
 end
 
 function (m::MixedOp)(x, αs)
+    #αs = αs
+    #αs = softmax(αs)
     mapreduce((op, α) -> (α/sum(αs))*op(x), +, m.ops, αs)
     #mapped = map(op -> op(x), m.ops)
     #sum((mask(m.location, αs) .* αs) * mapped)
@@ -292,7 +319,7 @@ struct DARTSModel
     classifier::Dense
 end
 
-function DARTSModel(; num_classes = 10, num_cells = 8, channels = 16, steps = 4, mult = 4 , stem_mult = 3)
+function DARTSModel(; α_init = (num_ops -> 2e-3*(rand(num_ops).-0.5) |> f32), num_classes = 10, num_cells = 8, channels = 16, steps = 4, mult = 4, stem_mult = 3)
     channels_current = channels*stem_mult
     stem = Chain(
         Conv((3,3), 3=>channels_current, pad=(1,1)),
@@ -323,11 +350,22 @@ function DARTSModel(; num_classes = 10, num_cells = 8, channels = 16, steps = 4,
     #α_normal = α14()
     #α_reduce = α14()
     num_ops = length(PRIMITIVES)
-    α_normal = [2e-3*(rand(num_ops).-0.5) |> f32 |> gpu  for _ in 1:k]
-    α_reduce = [2e-3*(rand(num_ops).-0.5) |> f32 |> gpu  for _ in 1:k]
+    α_normal = [α_init(num_ops) for _ in 1:k]
+    α_reduce = [α_init(num_ops) for _ in 1:k]
     #α_normal = rand(Float32, length(PRIMITIVES), k)
     #α_reduce = rand(Float32, length(PRIMITIVES), k)
     DARTSModel(α_normal, α_reduce, stem, cells, global_pooling, classifier)
+end
+
+
+function MaskedDARTSModel(m::DARTSModel; normal_αs = [], reduce_αs = [])
+    if length(normal_αs) == 0
+        normal_αs = m.normal_αs
+    end
+    if length(reduce_αs) == 0
+        reduce_αs = m.reduce_αs
+    end
+    DARTSModel(normal_αs, reduce_αs, m.stem, m.cells, m.global_pooling, m.classifier)
 end
 
 function (m::DARTSModel)(x)
@@ -336,6 +374,26 @@ function (m::DARTSModel)(x)
     for (i, cell) in enumerate(m.cells)
         #cell.reduction ? αs = softmax(m.reduce_αs, dims = 1) : αs = softmax(m.normal_αs, dims = 1)
         cell.reduction ? αs = m.reduce_αs : αs = m.normal_αs
+        new_state = cell(s1, s2, αs)
+        s1 = s2
+        s2 = new_state
+    end
+    out = m.global_pooling(s2)
+    m.classifier(squeeze(out))
+end
+
+function (m::DARTSModel)(x; normal_αs = [], reduce_αs = [])
+    if length(normal_αs) == 0
+        normal_αs = m.normal_αs
+    end
+    if length(reduce_αs) == 0
+        reduce_αs = m.reduce_αs
+    end
+    s1 = m.stem(x)
+    s2 = m.stem(x)
+    for (i, cell) in enumerate(m.cells)
+        #cell.reduction ? αs = softmax(m.reduce_αs, dims = 1) : αs = softmax(m.normal_αs, dims = 1)
+        cell.reduction ? αs = reduce_αs : αs = normal_αs
         new_state = cell(s1, s2, αs)
         s1 = s2
         s2 = new_state

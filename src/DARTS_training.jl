@@ -34,8 +34,8 @@ end
 runall(f) = f
 runall(fs::AbstractVector) = () -> foreach(call, fs)
 
-all_αs(model::DARTSModel) = params([model.normal_αs, model.reduce_αs])
-all_ws(model::DARTSModel) = params([model.stem, model.cells..., model.global_pooling, model.classifier])
+all_αs(model::DARTSModel) = Flux.params([model.normal_αs, model.reduce_αs])
+all_ws(model::DARTSModel) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
 
 function DARTStrain1st!(loss, model, train, val, opt_α, opt_w; cb = () -> ())
     function grad_loss(model, ps, batch, verbose = false)
@@ -137,7 +137,7 @@ function DARTStrain2nd!(loss, model, train, val, opt; cb = () -> ())
     end
 end
 
-all_ws(model::DARTSEvalModel) = params([model.stem, model.cells..., model.global_pooling, model.classifier])
+all_ws(model::DARTSEvalModel) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
 
 function DARTSevaltrain1st!(loss, model, train, opt_w; cb = () -> ())
     function grad_loss(model, ps, batch, verbose = false)

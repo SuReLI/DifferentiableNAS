@@ -36,9 +36,12 @@ MixedOperation(channels::Int64, kernel_options::AbstractArray) =
     MixedOperation([ReLUConv(channels, channels, (i, i), i ÷ 2) for i in kernel_options])
 
 function (m::MixedOperation)(x::AbstractArray, αs::AbstractArray)
-    αs = my_softmax(αs)
-    sum(αs .* [op(x) for op in m.operations])
-    #mapreduce((op, α) -> α * op(x), +, m.operations, αs)
+    #αs = my_softmax(αs)
+    println(typeof(αs))
+    softmax!(similar(αs),αs)
+    println(typeof(αs))
+    #sum(αs .* Tuple(op(x) for op in m.operations))
+    mapreduce((op, α) -> α * op(x), +, m.operations, αs)
 end
 
 Flux.@functor MixedOperation

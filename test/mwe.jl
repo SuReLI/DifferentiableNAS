@@ -1,5 +1,6 @@
 using Flux
 using Zygote
+using LinearAlgebra
 
 function gshow(x)
     @show typeof(x) size(x)
@@ -13,13 +14,13 @@ Zygote.@adjoint function gshow(x)
 end
 
 function my_softmax(xs; dims = 1)
-    #@show typeof(xs) xs
+    @show typeof(xs) xs
     softmax(xs, dims = dims)
 end
 
 Zygote.@adjoint function my_softmax(xs; dims = 1)
     softmax(xs, dims = dims), Δ -> begin
-        #@show typeof(Δ) Δ typeof(xs) xs ∇softmax(Δ, xs, dims = dims)
+        @show typeof(Δ) Δ typeof(xs) xs ∇softmax(Δ, xs, dims = dims)
         (∇softmax(Δ, xs, dims = dims),)
     end
 end
@@ -36,13 +37,9 @@ MixedOperation(channels::Int64, kernel_options::AbstractArray) =
     MixedOperation([ReLUConv(channels, channels, (i, i), i ÷ 2) for i in kernel_options])
 
 function (m::MixedOperation)(x::AbstractArray, αs::AbstractArray)
-    #αs = my_softmax(αs)
-    αs = Zygote.dropgrad(softmax(αs))
-    #println(typeof(αs))
-    #softmax!(similar(αs),αs)
-    println(typeof(αs))
-    #sum(αs .* Tuple(op(x) for op in m.operations))
-    mapreduce((op, α) -> α * op(x), +, m.operations, αs) 
+    αs = my_softmax(αs)
+    #mapreduce((op, α) -> α * op(x), +, m.operations, αs))
+    norm(αs)*m.operations[1](x)
 end
 
 Flux.@functor MixedOperation
@@ -66,6 +63,5 @@ gws = gradient(Flux.params(m.operations)) do
     sum(m(test_image, αs))
 end
 for ws in Flux.params(m.operations)
-    @show gws[ws]
     @test !isa(gws[ws], Nothing)
 end

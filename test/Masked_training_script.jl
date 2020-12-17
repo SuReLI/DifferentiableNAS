@@ -6,6 +6,7 @@ using StatsBase: mean
 using CUDA
 using Distributions
 using BSON
+using Dates
 include("CIFAR10.jl")
 @nograd onehotbatch
 
@@ -49,9 +50,11 @@ optimizer_w = Nesterov(0.025,0.9)
 train, val = get_processed_data(splitr, batchsize)
 test = get_test_data(0.01)
 
-Base.@kwdef mutable struct α_histories
+Base.@kwdef mutable struct histories
     normal_αs::Vector{Vector{Array{Float32, 1}}}
     reduce_αs::Vector{Vector{Array{Float32, 1}}}
+    activations::Dict
+    accuracies::Vector{Float32}
 end
 
 
@@ -59,7 +62,8 @@ function (hist::α_histories)()
     push!(hist.normal_αs, m.normal_αs |> cpu)
     push!(hist.reduce_αs, m.reduce_αs |> cpu)
 end
-hist = α_histories([],[])
+histepoch = α_histories([],[])
+histbatch = α_histories([],[])
 
 struct CbAll
     cbs
@@ -67,12 +71,13 @@ end
 CbAll(cbs...) = CbAll(cbs)
 
 (cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
-cbs = CbAll(losscb, hist)
+cbepoch = CbAll(acccb, histepoch)
+cbbatch = CbAll(losscb, histbatch)
 
-Flux.@epochs 10 Standardtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w; cb = cbs)
-BSON.@save "test/models/pretrainedmasktest.bson" m
+Flux.@epochs 1 Standardtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w; cb = cbs)
+BSON.@save string("test/models/pretrainedmasktest", Dates.now(), ".bson") m histepoch histbatch
 
-BSON.@load "test/models/pretrainedmasktest.bson" m
+#BSON.@load "test/models/pretrainedmasktest_.bson" m
 Flux.@epochs 10 Maskedtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w; cb = cbs)
 
 """

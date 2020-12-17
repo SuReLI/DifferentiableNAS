@@ -5,6 +5,8 @@ using Zygote: @nograd
 using StatsBase: mean
 using CUDA
 using Distributions
+using BSON
+using Dates
 include("CIFAR10.jl")
 @nograd onehotbatch
 
@@ -12,7 +14,7 @@ steps = 4
 k = floor(Int, steps^2/2+3*steps/2)
 num_ops = length(PRIMITIVES)
 
-m = DARTSModel(num_cells = 3, channels = 4) |> gpu
+m = DARTSModel() |> gpu
 epochs = 50
 #batchsize = 64
 batchsize = 32
@@ -68,8 +70,8 @@ CbAll(cbs...) = CbAll(cbs)
 (cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
 cbs = CbAll(losscb, hist)
 
-Flux.@epochs 1 DARTStrain1st!(loss, m, train, val, optimizer_α, optimizer_w; cb = cbs)
-
+Flux.@epochs 10 DARTStrain1st!(loss, m, train, val, optimizer_α, optimizer_w; cb = cbs)
+BSON.@save string("test/models/dartstest", Dates.now(), ".bson") m hist
 
 using Plots
 using Colors

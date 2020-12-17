@@ -155,7 +155,17 @@ end
 
 Flux.@functor ParOp
 
+function my_softmax(xs; dims = 1)
+    #@show typeof(xs) xs
+    softmax(xs, dims = dims)
+end
 
+Zygote.@adjoint function my_softmax(xs; dims = 1)
+    softmax(xs, dims = dims), Δ -> begin
+        #@show typeof(Δ) Δ typeof(xs) xs ∇softmax(Δ, xs, dims = dims)
+        (∇softmax(Δ, xs, dims = dims),)
+    end
+end
 
 struct MixedOp
     location::Int64
@@ -171,13 +181,10 @@ function mask(row::Int64, shape::AbstractArray)
 end
 
 function (m::MixedOp)(x, αs)
-    #αs = αs
-    αs = Zygote.dropgrad(softmax(αs))
-    #@show typeof(αs)
-    mapreduce((op, α) -> (α)*op(x), +, m.ops, αs)
-    #mapped = map(op -> op(x), m.ops)
-    #dot(αs,mapped)
-    #reduce(+, αs, mapped)
+    #αs = Zygote.dropgrad(softmax(αs))
+    #mapreduce((op, α) -> (α)*op(x), +, m.ops, αs)
+    αs = my_softmax(αs)
+    sum(αs[i]*m.ops[i](x) for i in 1:length(αs))
 end
 
 Flux.@functor MixedOp

@@ -37,11 +37,12 @@ MixedOperation(channels::Int64, kernel_options::AbstractArray) =
 
 function (m::MixedOperation)(x::AbstractArray, αs::AbstractArray)
     #αs = my_softmax(αs)
-    println(typeof(αs))
-    softmax!(similar(αs),αs)
+    αs = Zygote.dropgrad(softmax(αs))
+    #println(typeof(αs))
+    #softmax!(similar(αs),αs)
     println(typeof(αs))
     #sum(αs .* Tuple(op(x) for op in m.operations))
-    mapreduce((op, α) -> α * op(x), +, m.operations, αs)
+    mapreduce((op, α) -> α * op(x), +, m.operations, αs) 
 end
 
 Flux.@functor MixedOperation
@@ -55,15 +56,16 @@ test_image = rand(Float32, 16, 16, 3, 1) |> gpu
 @test sum(m(test_image, αs)) != 0
 grad = gradient((x,αs) -> sum(m(x,αs)), test_image, αs)
 
-gαs = gradient(params(αs)) do
+gαs = gradient(Flux.params(αs)) do
     sum(m(test_image, αs))
 end
-for a in params(αs)
+for a in Flux.params(αs)
     @show gαs[a]
 end
-gws = gradient(params(m.operations)) do
+gws = gradient(Flux.params(m.operations)) do
     sum(m(test_image, αs))
 end
-for ws in params(m.operations)
+for ws in Flux.params(m.operations)
+    @show gws[ws]
     @test !isa(gws[ws], Nothing)
 end

@@ -172,10 +172,12 @@ end
 
 function (m::MixedOp)(x, αs)
     #αs = αs
-    #αs = softmax(αs)
-    mapreduce((op, α) -> (α/sum(αs))*op(x), +, m.ops, αs)
+    αs = Zygote.dropgrad(softmax(αs))
+    #@show typeof(αs)
+    mapreduce((op, α) -> (α)*op(x), +, m.ops, αs)
     #mapped = map(op -> op(x), m.ops)
-    #sum((mask(m.location, αs) .* αs) * mapped)
+    #dot(αs,mapped)
+    #reduce(+, αs, mapped)
 end
 
 Flux.@functor MixedOp

@@ -1,4 +1,4 @@
-export Maskedtrain1st!, Standardtrain1st
+export Maskedtrain1st!, Standardtrain1st!
 
 using Flux
 using Flux: onehotbatch

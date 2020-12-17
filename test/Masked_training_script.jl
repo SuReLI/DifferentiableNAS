@@ -13,10 +13,11 @@ num_ops = length(PRIMITIVES)
 
 m = DARTSModel(α_init = (num_ops -> ones(num_ops) |> f32), num_cells = 3, channels = 4) |> gpu
 epochs = 50
-#batchsize = 64
-batchsize = 32
+batchsize = 64
+#batchsize = 32
 throttle_ = 20
-splitr = 0.5
+#splitr = 0.5
+splitr = 0.2
 losscb() = @show(loss(m, test[1] |> gpu, test[2] |> gpu))
 throttled_cb = throttle(losscb, throttle_)
 function loss(m, x, y)
@@ -45,7 +46,7 @@ optimizer_α = ADAM(3e-4,(0.9,0.999))
 optimizer_w = Nesterov(0.025,0.9)
 
 
-train, val = get_processed_data(splitr, batchsize, 0.05)
+train, val = get_processed_data(splitr, batchsize)
 test = get_test_data(0.01)
 
 Base.@kwdef mutable struct α_histories

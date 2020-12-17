@@ -1,4 +1,4 @@
-export Maskedtrain1st!
+export Maskedtrain1st!, Standardtrain1st
 
 using Flux
 using Flux: onehotbatch
@@ -48,6 +48,25 @@ function perturb(αs::AbstractArray)
     (row, inds, perturbs)
 end
 
+function Standardtrain1st!(accuracy, loss, model, train, val, opt; cb = () -> ())
+    function grad_loss(model, ps, batch, verbose = false)
+        gs = gradient(ps) do
+            loss(model, batch...)
+        end
+    end
+
+    w = all_ws(model)
+
+    for train_batch in train
+        t_gpu = train_batch |> gpu
+        gsw = grad_loss(model, w, t_gpu)
+        Flux.Optimise.update!(opt, w, gsw)
+        cb()
+    end
+    cb()
+end
+
+
 function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cb = () -> ())
     function grad_loss(model, ps, batch, verbose = false)
         gs = gradient(ps) do
@@ -61,12 +80,13 @@ function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cb = () -> ())
         t_gpu = train_batch |> gpu
         gsw = grad_loss(model, w, t_gpu)
         Flux.Optimise.update!(opt, w, gsw)
-        #cb()
+        cb()
     end
 
     row, inds, perturbs = perturb(model.normal_αs)
     vals = [accuracy(model, val, pert = pert) for pert in perturbs]
     model.normal_αs[row][findmax(vals)[2]] = 0
+    display(row, model.normal_αs[row])
 
     cb()
 end

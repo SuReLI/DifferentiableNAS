@@ -5,6 +5,7 @@ using Zygote: @nograd
 using StatsBase: mean
 using CUDA
 using Distributions
+using BSON
 include("CIFAR10.jl")
 @nograd onehotbatch
 
@@ -44,7 +45,7 @@ optimizer_α = ADAM(3e-4,(0.9,0.999))
 optimizer_w = Nesterov(0.025,0.9)
 
 
-train, val = get_processed_data(splitr, batchsize, 0.005)
+train, val = get_processed_data(splitr, batchsize, 0.05)
 test = get_test_data(0.01)
 
 Base.@kwdef mutable struct α_histories
@@ -67,9 +68,13 @@ CbAll(cbs...) = CbAll(cbs)
 (cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
 cbs = CbAll(losscb, hist)
 
+Flux.@epochs 10 Standardtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w; cb = cbs)
+BSON.@save "test/models/pretrainedmasktest.bson" m
+
+BSON.@load "test/models/pretrainedmasktest.bson" m
 Flux.@epochs 10 Maskedtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w; cb = cbs)
 
-
+"""
 using Plots
 using Colors
 using ColorBrewer
@@ -82,6 +87,8 @@ for j = 1:8
     end
 end
 plot(p..., layout = (4,2), size = (600,1100))
+"""
+
 
 #need to clear GPU first
 m_eval = DARTSEvalModel(m, num_cells=20, channels=36) |> gpu

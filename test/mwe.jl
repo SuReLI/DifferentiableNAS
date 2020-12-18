@@ -1,17 +1,5 @@
 using Flux
 using Zygote
-using LinearAlgebra
-
-function gshow(x)
-    @show typeof(x) size(x)
-    x
-end
-Zygote.@adjoint function gshow(x)
-    gshow(x), dx -> begin
-         @show typeof(dx) size(dx) dx
-         tuple(dx)
-    end
-end
 
 function my_softmax(xs; dims = 1)
     @show typeof(xs) xs
@@ -37,9 +25,11 @@ MixedOperation(channels::Int64, kernel_options::AbstractArray) =
     MixedOperation([ReLUConv(channels, channels, (i, i), i ÷ 2) for i in kernel_options])
 
 function (m::MixedOperation)(x::AbstractArray, αs::AbstractArray)
+    #αs = softmax(αs)
     αs = my_softmax(αs)
-    #mapreduce((op, α) -> α * op(x), +, m.operations, αs))
-    norm(αs)*m.operations[1](x)
+    #mapreduce((op, α) -> α * op(x), +, m.operations, αs) #errors out in gradient of above line
+    #sum(αs[i]*m.operations[i](x) for i in 1:length(αs))
+    sum(αs .* map(op -> op(x), m.operations))
 end
 
 Flux.@functor MixedOperation
@@ -58,10 +48,5 @@ gαs = gradient(Flux.params(αs)) do
 end
 for a in Flux.params(αs)
     @show gαs[a]
-end
-gws = gradient(Flux.params(m.operations)) do
-    sum(m(test_image, αs))
-end
-for ws in Flux.params(m.operations)
-    @test !isa(gws[ws], Nothing)
+    @test isa(gαs[a], CuArray)
 end

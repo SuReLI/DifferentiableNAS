@@ -10,7 +10,7 @@ include("CIFAR10.jl")
     steps = 4
     k = floor(Int, steps^2/2+3*steps/2)
     num_ops = length(PRIMITIVES)
-    mo = MixedOp(4,1,1)  |> gpu
+    mo = MixedOp("1-2",4,1)  |> gpu
     @test length(Flux.params(mo).order |> cpu) > 0
     data = rand(Float32,8,8,4,2)  |> gpu
     α = rand(Float32, num_ops)  |> gpu
@@ -57,17 +57,6 @@ end
     gαs = gradient(Flux.params(m.normal_αs)) do
         sum(m(test_image))
     end
-    for k in keys(gαs.grads)
-        if isa(gαs.grads[k],NamedTuple)
-            display(gαs.grads[k].:normal_αs)
-        end
-    end
-    for α in Flux.params(m.normal_αs).order
-        for v in values(gαs.grads)
-            if isa(v,AbstractArray) && size(α) == size(v)
-                display(v)
-            end
-        end
-    end
     @test typeof(gαs[Flux.params(m.normal_αs)[1]]) != Nothing
+    @show m.activations
 end

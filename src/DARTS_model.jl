@@ -7,7 +7,7 @@ using Zygote
 using LinearAlgebra
 using CUDA
 using JuliennedArrays
-using Zygote: @adjoint, _zero
+using Zygote: @adjoint, _zero, dropgrad
 using SliceMap
 
 
@@ -132,37 +132,48 @@ OPS = Dict(
         ) |> gpu,
 )
 
-
-struct ParOp
-    ops::AbstractArray
+function my_softmax(xs; dims = 1)
+    softmax(xs, dims = dims)
 end
 
-ParOp(channels::Int64, stride::Int64) = ParOp([OPS[prim](channels, stride, 1) |> gpu for prim in PRIMITIVES]) |> gpu
-
-function mask(row::Int64, shape::AbstractArray)
-    m = zeros(Float32, size(shape)...)
-    m[row,:] .= 1
-    m
+Zygote.@adjoint function my_softmax(xs; dims = 1)
+    softmax(xs, dims = dims), Δ -> begin
+        (∇softmax(Δ, xs, dims = dims),)
+    end
 end
 
-function (m::ParOp)(x, αs)
-    opouts = [op(x) for op in m.ops]
-    #return
-    #mapreduce((op, α) -> (α/sum(αs))*op(x), +, m.ops, αs)
-    #mapped = map(op -> op(x), m.ops)
-    #sum((mask(m.location, αs) .* αs) * mapped)
+struct Op
+    name::String
+    op
 end
 
-Flux.@functor ParOp
+function showlayer(x, layer, outs)
+    out = layer(x)
+    Zygote.ignore() do
+        push!(outs, out |> cpu)
+    end
+    out
+end
 
+function(opwrap::Op)(x; acts::Dict = Dict())
+    outs = Array{typeof(x |> cpu)}(undef, 0)
+    out = foldl((x, layer) -> showlayer(x, layer, outs), opwrap.op, init = x)
+    Zygote.ignore() do
+        acts[opwrap.name] = outs
+    end
+    out
+end
 
+Flux.@functor Op
 
 struct MixedOp
-    location::Int64
+    name::String
     ops::AbstractArray
 end
 
-MixedOp(channels::Int64, stride::Int64, location::Int64) = MixedOp(location, [OPS[prim](channels, stride, 1) |> gpu for prim in PRIMITIVES]) |> gpu
+#add "hook" after each op here?
+
+MixedOp(name::String, channels::Int64, stride::Int64) = MixedOp(name, [Op(string(name, "-", prim), OPS[prim](channels, stride, 1) |> gpu) for prim in PRIMITIVES]) |> gpu
 
 function mask(row::Int64, shape::AbstractArray)
     m = zeros(Float32, size(shape)...)
@@ -170,62 +181,13 @@ function mask(row::Int64, shape::AbstractArray)
     m
 end
 
-function (m::MixedOp)(x, αs)
-    #αs = αs
-    αs = Zygote.dropgrad(softmax(αs))
-    #@show typeof(αs)
-    mapreduce((op, α) -> (α)*op(x), +, m.ops, αs)
-    #mapped = map(op -> op(x), m.ops)
-    #dot(αs,mapped)
-    #reduce(+, αs, mapped)
+function (m::MixedOp)(x, αs; ms = nothing, acts = Dict())
+    αs = my_softmax(αs)
+    sum(αs[i]*m.ops[i](x, acts = acts) for i in 1:length(αs))
 end
 
 Flux.@functor MixedOp
 
-my_zero(xs::AbstractArray) = fill!(similar(xs), zero(eltype(xs)))
-
-collecteachrow(x) = collect(eachrow(x))
-
-@adjoint function collecteachrow(x)
-    collecteachrow(x), dy -> begin
-        dx = my_zero(x) # _zero is not in ZygoteRules, TODO
-        foreach(copyto!, collecteachrow(dx), dy)
-        (dx,)
-    end
-end
-
-"""
-@adjoint function mapreduce(op, func, xs; kwargs...)
-    opbacks = Any[]
-    backs = Any[]
-    ys = Any[]
-    function nop(x)
-        y, back = pullback(op,x)
-        push!(opbacks, back)
-        y
-    end
-    function nfunc(x, x2)
-        y, back = pullback(func, x, x2)
-        push!(backs, back)
-        push!(ys, y)
-        return y
-    end
-    mapreduce(nop, nfunc, xs; kwargs...),
-    function (adjy)
-        offset = haskey(kwargs, :init) ? 0 : 1
-        res = Vector{Any}(undef, length(ys)+offset)
-        for i=length(ys):-1:1
-            opback, back, y = opbacks[i+offset], backs[i], ys[i]
-            adjy, adjthis = back(adjy)
-            res[i+offset], = opback(adjthis)
-        end
-        if offset==1
-            res[1], = opbacks[1](adjy)
-        end
-        return (nothing, nothing, res)
-    end
-end
-"""
 
 struct Cell
     steps::Int64
@@ -244,17 +206,17 @@ function Cell(channels_before_last, channels_last, channels, reduce, reduce_prev
     end
     prelayer2 = ReLUConvBN(channels_last,channels,(1,1),1,0) |> gpu
     mixedops = []
-    for i = 0:steps-1
-       for j = 0:2+i-1
-            reduce && j < 2 ? stride = 2 : stride = 1
-            mixedop = MixedOp(channels, stride, length(mixedops)+1) |> gpu
+    for i = 3:steps+2 #op output
+       for j = 1:i-1 #op input
+            reduce && j < 3 ? stride = 2 : stride = 1
+            mixedop = MixedOp(string(j, "-", i), channels, stride) |> gpu
             push!(mixedops, mixedop)
         end
     end
     Cell(steps, reduce, multiplier, prelayer1, prelayer2, mixedops) |> gpu
 end
 
-function (m::Cell)(x1, x2, αs)
+function (m::Cell)(x1, x2, αs; acts = Dict())
     state1 = m.prelayer1(x1)
     state2 = m.prelayer2(x2)
 
@@ -262,27 +224,10 @@ function (m::Cell)(x1, x2, αs)
 
     states[1] = state1
     states[2] = state2
-    # states[3] = m.mixedops[1](states[1],αs.α1) + m.mixedops[2](states[2],αs.α2)
-    # states[4] = m.mixedops[3](states[1],αs.α3) + m.mixedops[4](states[2],αs.α4) + m.mixedops[5](states[3],αs.α5)
-    # states[5] = m.mixedops[6](states[1],αs.α6) + m.mixedops[7](states[2],αs.α7) + m.mixedops[8](states[3],αs.α8) + m.mixedops[9](states[4],αs.α9)
-    # states[6] = m.mixedops[10](states[1],αs.α10) + m.mixedops[11](states[2],αs.α11) + m.mixedops[12](states[3],αs.α12) + m.mixedops[13](states[4],αs.α13) + m.mixedops[14](states[5],αs.α14)
-    #
     offset = 0
-    #mo_α = collect(zip(m.mixedops, collect(eachrow(αs))))
     for step in 1:m.steps
-        #state = mapreduce((mixedop, α, state) -> mixedop(state, α), +, m.mixedops[offset+1:offset+step+1], collecteachrow(αs)[offset+1:offset+step+1], states)
-        #state = mapreduce(((mixedop, α), state) -> mixedop(state, α), +, mo_α[offset+1:offset+step+1], states)
-        state = mapreduce((mixedop, α, previous_state) -> mixedop(previous_state, α), +, m.mixedops[offset+1:offset+step+1], αs[offset+1:offset+step+1], states)
-        # to_sum = Zygote.Buffer([state1], step+1)
-        # for i in 1:step+1
-        #     mo = m.mixedops[offset+i]
-        #     α = αs[offset+i]
-        #     #α = getfield(αs,offset+i)
-        #     state = states[i]
-        #     to_sum[i] = mo(state,α)
-        # end
+        state = mapreduce((mixedop, α, previous_state) -> mixedop(previous_state, α, acts = acts), +, m.mixedops[offset+1:offset+step+1], αs[offset+1:offset+step+1], states)
         offset += step + 1
-        #states[step+2] = sum(to_sum)
         states[step+2] = state
     end
     states_ = copy(states)
@@ -291,26 +236,6 @@ end
 
 Flux.@functor Cell
 
-struct α14
-    α1::AbstractArray
-    α2::AbstractArray
-    α3::AbstractArray
-    α4::AbstractArray
-    α5::AbstractArray
-    α6::AbstractArray
-    α7::AbstractArray
-    α8::AbstractArray
-    α9::AbstractArray
-    α10::AbstractArray
-    α11::AbstractArray
-    α12::AbstractArray
-    α13::AbstractArray
-    α14::AbstractArray
-end
-
-α14() = α14([2e-3*(rand(length(PRIMITIVES)).-0.5) |> f32 |> gpu  for _ in 1:14]...)
-
-Flux.@functor α14
 
 struct DARTSModel
     normal_αs::AbstractArray
@@ -319,6 +244,7 @@ struct DARTSModel
     cells::AbstractArray
     global_pooling::AdaptiveMeanPool
     classifier::Dense
+    activations::Dict
 end
 
 function DARTSModel(; α_init = (num_ops -> 2e-3*(rand(num_ops).-0.5) |> f32), num_classes = 10, num_cells = 8, channels = 16, steps = 4, mult = 4, stem_mult = 3)
@@ -349,14 +275,10 @@ function DARTSModel(; α_init = (num_ops -> 2e-3*(rand(num_ops).-0.5) |> f32), n
     global_pooling = AdaptiveMeanPool((1,1)) |> gpu
     classifier = Dense(channels_last, num_classes) |> gpu
     k = floor(Int, steps^2/2+3*steps/2)
-    #α_normal = α14()
-    #α_reduce = α14()
     num_ops = length(PRIMITIVES)
     α_normal = [α_init(num_ops) for _ in 1:k]
     α_reduce = [α_init(num_ops) for _ in 1:k]
-    #α_normal = rand(Float32, length(PRIMITIVES), k)
-    #α_reduce = rand(Float32, length(PRIMITIVES), k)
-    DARTSModel(α_normal, α_reduce, stem, cells, global_pooling, classifier)
+    DARTSModel(α_normal, α_reduce, stem, cells, global_pooling, classifier, Dict())
 end
 
 
@@ -371,15 +293,16 @@ function MaskedDARTSModel(m::DARTSModel; normal_αs = [], reduce_αs = [])
 end
 
 function (m::DARTSModel)(x)
+    acts = Dict()
     s1 = m.stem(x)
     s2 = m.stem(x)
     for (i, cell) in enumerate(m.cells)
-        #cell.reduction ? αs = softmax(m.reduce_αs, dims = 1) : αs = softmax(m.normal_αs, dims = 1)
         cell.reduction ? αs = m.reduce_αs : αs = m.normal_αs
-        new_state = cell(s1, s2, αs)
+        new_state = cell(s1, s2, αs, acts = acts)
         s1 = s2
         s2 = new_state
     end
+    m.activations = acts
     out = m.global_pooling(s2)
     m.classifier(squeeze(out))
 end
@@ -394,7 +317,6 @@ function (m::DARTSModel)(x; normal_αs = [], reduce_αs = [])
     s1 = m.stem(x)
     s2 = m.stem(x)
     for (i, cell) in enumerate(m.cells)
-        #cell.reduction ? αs = softmax(m.reduce_αs, dims = 1) : αs = softmax(m.normal_αs, dims = 1)
         cell.reduction ? αs = reduce_αs : αs = normal_αs
         new_state = cell(s1, s2, αs)
         s1 = s2
@@ -466,6 +388,7 @@ end
 function DARTSEvalModel(searchmodel::DARTSModel; num_cells = 8, channels = 16, num_classes = 10, steps = 4, mult = 4 , stem_mult = 3)
     α_normal = searchmodel.normal_αs
     α_reduce = searchmodel.reduce_αs
+    #still ened to discretize alphas so that only top 1 operation from each of top 2 input nodes is going to each outout node
     channels_current = channels*stem_mult
     stem = Chain(
         Conv((3,3), 3=>channels_current, pad=(1,1)),

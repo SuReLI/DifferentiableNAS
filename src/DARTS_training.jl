@@ -37,7 +37,7 @@ runall(fs::AbstractVector) = () -> foreach(call, fs)
 all_αs(model::DARTSModel) = Flux.params([model.normal_αs, model.reduce_αs])
 all_ws(model::DARTSModel) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
 
-function DARTStrain1st!(loss, model, train, val, opt_α, opt_w; cb = () -> ())
+function DARTStrain1st!(loss, model, train, val, opt_α, opt_w; cbepoch = () -> (), cbbatch = () -> ())
     function grad_loss(model, ps, batch, verbose = false)
         gs = gradient(ps) do
             loss(model, batch...)
@@ -59,9 +59,9 @@ function DARTStrain1st!(loss, model, train, val, opt_α, opt_w; cb = () -> ())
         gsw = grad_loss(model, w, t_gpu)
         Flux.Optimise.update!(opt_w, w, gsw)
         #CUDA.unsafe_free!(t_gpu[1])
-        cb()
+        cbbatch()
     end
-    cb()
+    cbepoch()
 end
 
 

@@ -1,6 +1,7 @@
 using DifferentiableNAS
 using Flux
 using Flux: throttle, logitcrossentropy, onecold, onehotbatch
+using Zygote: @nograd
 using StatsBase: mean
 using Parameters
 using CUDA

@@ -349,7 +349,12 @@ struct EvalCell
     ops::AbstractArray
 end
 
-function EvalCell(channels_before_last, channels_last, channels, reduce, reduce_previous, steps, multiplier, all_αs)
+function maxk(a, k)
+    b = partialsortperm(a, 1:k, rev=true)
+    return collect(b)
+end
+
+function EvalCell(channels_before_last, channels_last, channels, reduce, reduce_previous, steps, multiplier, αs)
     if reduce_previous
         prelayer1 = FactorizedReduce(channels_before_last,channels,2)
     else
@@ -357,12 +362,15 @@ function EvalCell(channels_before_last, channels_last, channels, reduce, reduce_
     end
     prelayer2 = ReLUConvBN(channels_last,channels,(1,1),1,0)
     ops = []
-    for i = 0:steps-1
-       for j = 0:2+i-1
-            reduce && j < 2 ? stride = 2 : stride = 1
-            op = OPS[PRIMITIVES[argmax(all_αs[length(ops)+1,:])]](channels, stride, 1)
-            push!(ops, op)
-        end
+    inputindices = []
+    rows = 0
+    for i = 3:steps+2 #TODO test this loop
+        options = [findmax(αs[rows+j]) for j = 1:i-1]
+        top2 = partialsortperm(options, 1:2, by = x -> x[1], rev=true)
+        top2ops = (OPS[PRIMITIVES[options[i][2]]](channels, reduce && i < 3 ? 2 : 1, 1) for i in top2)
+        push!(inputindices, top2)
+        push!(ops, top2ops)
+        rows += i-1
     end
     EvalCell(steps, reduce, multiplier, prelayer1, prelayer2, ops)
 end
@@ -413,12 +421,12 @@ function DARTSEvalModel(searchmodel::DARTSModel; num_cells = 8, channels = 16, n
         if i == num_cells÷3+1 || i == 2*num_cells÷3+1
             channels_current = channels_current*2
             reduce = true
-            all_αs = α_reduce
+            αs = α_reduce
         else
             reduce = false
-            all_αs = α_normal
+            αs = α_normal
         end
-        cell = EvalCell(channels_before_last, channels_last, channels_current, reduce, reduce_previous, steps, mult, all_αs)
+        cell = EvalCell(channels_before_last, channels_last, channels_current, reduce, reduce_previous, steps, mult, αs)
         push!(cells, cell)
 
         reduce_previous = reduce

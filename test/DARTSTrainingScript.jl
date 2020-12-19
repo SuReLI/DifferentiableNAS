@@ -69,7 +69,11 @@ function (hist::histories)()
     push!(hist.normal_αs, m.normal_αs |> cpu)
     push!(hist.reduce_αs, m.reduce_αs |> cpu)
     push!(hist.activations, m.activations.activations |> cpu)
+<<<<<<< HEAD
     #push!(hist.accuracies, accuracy_batched(m, val))
+=======
+    push!(hist.accuracies, accuracy_batched(m, val |> gpu))
+>>>>>>> a5ad7cd7c586be3c8a71c8cf41a2295fe940e167
 end
 histepoch = histories([],[],[],[])
 histbatch = histories([],[],[],[])

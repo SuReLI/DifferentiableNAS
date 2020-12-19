@@ -21,28 +21,35 @@ end
 Base.@kwdef mutable struct histories
     normal_αs::Vector{Vector{Array{Float32, 1}}}
     reduce_αs::Vector{Vector{Array{Float32, 1}}}
-    activations::Vector{Dict}
+    activations::Vector{Any}
     accuracies::Vector{Float32}
 end
 
-function (hist::histories)()
-    push!(hist.normal_αs, m.normal_αs |> cpu)
-    push!(hist.reduce_αs, m.reduce_αs |> cpu)
-    push!(hist.activations, m.activations |> cpu)
-    push!(hist.accuracies, accuracy_batched(m, val |> gpu))
-end
-histepoch = histories([],[],[],[])
-histbatch = histories([],[],[],[])
-
-file_name = "test/models/pretrainedmaskprogress.bson"
+file_name = "test/models/pretrainedmaskprogress2020-12-19T13:59:31.902.bson"
 BSON.@load file_name m histepoch histbatch
 
+connects = vcat([[(j,i) for j = 1:i-1] for i = 3:6]...)
+
+n_y_min = minimum([softmax(a[i])[j] for a in histbatch.normal_αs for i in 1:14 for j in 1:8])
+n_y_max = maximum([softmax(a[i])[j] for a in histbatch.normal_αs for i in 1:14 for j in 1:8])
 p = Vector(undef, 14)
 for i = 1:14
-    p[i] = plot(title = "Op $i, 1st order", legend = :outertopright)
+    p[i] = plot(title = string("Op ",connects[i][1],"->",connects[i][2]), legend = :outertopright)
     for j = 1:8
-        plot!([softmax(a[i])[j] for a in histbatch.normal_αs], xlabel="Batch", ylabel="alpha", label=PRIMITIVES[j])#labels=["2nd:1dConv 1 layer" "2nd:1dConv 2 layer" "2nd:2dConv 1 layer" "2nd:2dConv 2 layer"], legend=:right)
+        plot!([softmax(a[i])[j] for a in histbatch.normal_αs], xlabel="Batch", ylabel="alpha", label=PRIMITIVES[j], ylim=(n_y_min,n_y_max))
     end
 end
 gui(plot(p..., layout = (7,2), size = (2000,2000)))
-savefig("test/models/fig.png")
+savefig("test/models/fig_n.png")
+
+r_y_min = minimum([softmax(a[i])[j] for a in histbatch.reduce_αs for i in 1:14 for j in 1:8])
+r_y_max = maximum([softmax(a[i])[j] for a in histbatch.reduce_αs for i in 1:14 for j in 1:8])
+p = Vector(undef, 14)
+for i = 1:14
+    p[i] = plot(title = string("Op ",connects[i][1],"->",connects[i][2]), legend = :outertopright, xlabel="Batch", ylabel="alpha", ylim=(r_y_min,r_y_max))
+    for j = 1:8
+        plot!([softmax(a[i])[j] for a in histbatch.reduce_αs], label=PRIMITIVES[j])
+    end
+end
+gui(plot(p..., layout = (7,2), size = (2000,2000)))
+savefig("test/models/fig_r.png")

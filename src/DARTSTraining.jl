@@ -10,7 +10,7 @@ using Zygote: @nograd
 using LinearAlgebra
 using CUDA
 include("utils.jl")
-include("DARTS_model.jl")
+include("DARTSModel.jl")
 @nograd onehotbatch
 @nograd softmax
 

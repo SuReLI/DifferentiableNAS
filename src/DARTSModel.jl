@@ -1,4 +1,4 @@
-export PRIMITIVES, DARTSModel, Cell, MixedOp, DARTSEvalModel, MaskedDARTSModel
+export PRIMITIVES, DARTSModel, Cell, MixedOp, DARTSEvalModel, MaskedDARTSModel, Activations
 
 using Flux
 using Base.Iterators
@@ -317,6 +317,7 @@ function (m::DARTSModel)(x)
 end
 
 function (m::DARTSModel)(x; normal_αs = [], reduce_αs = [])
+    acts = Dict()
     if length(normal_αs) == 0
         normal_αs = m.normal_αs
     end
@@ -332,7 +333,7 @@ function (m::DARTSModel)(x; normal_αs = [], reduce_αs = [])
         s2 = new_state
     end
     out = m.global_pooling(s2)
-    #m.activations.activations = acts
+    m.activations.activations = acts
     m.classifier(squeeze(out))
 end
 

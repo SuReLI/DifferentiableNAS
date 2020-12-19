@@ -68,7 +68,7 @@ end
 function (hist::histories)()
     push!(hist.normal_αs, m.normal_αs |> cpu)
     push!(hist.reduce_αs, m.reduce_αs |> cpu)
-    push!(hist.activations, m.activations |> cpu)
+    push!(hist.activations, m.activations.activations |> cpu)
     push!(hist.accuracies, accuracy_batched(m, val |> gpu))
 end
 histepoch = histories([],[],[],[])

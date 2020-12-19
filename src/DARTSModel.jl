@@ -323,16 +323,17 @@ function (m::DARTSModel)(x; normal_αs = [], reduce_αs = [])
     if length(reduce_αs) == 0
         reduce_αs = m.reduce_αs
     end
+    acts = Dict()
     s1 = m.stem(x)
     s2 = m.stem(x)
     for (i, cell) in enumerate(m.cells)
         cell.reduction ? αs = reduce_αs : αs = normal_αs
-        new_state = cell(s1, s2, αs)
+        new_state = cell(s1, s2, αs, acts)
         s1 = s2
         s2 = new_state
     end
     out = m.global_pooling(s2)
-    #m.activations.activations = acts
+    m.activations.activations = acts
     m.classifier(squeeze(out))
 end
 

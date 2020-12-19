@@ -20,11 +20,11 @@ include("CIFAR10.jl")
     test_fraction::Float32 = 1.0
 end
 
-argparams = trial_params()
+argparams = trial_params(batchsize = 32)
 
 num_ops = length(PRIMITIVES)
 
-m = DARTSModel() |> gpu
+m = DARTSModel(num_cells = 5) |> gpu
 
 losscb() = @show(loss(m, test[1] |> gpu, test[2] |> gpu))
 throttled_losscb = throttle(losscb, argparams.throttle_)
@@ -68,8 +68,8 @@ end
 function (hist::histories)()
     push!(hist.normal_αs, m.normal_αs |> cpu)
     push!(hist.reduce_αs, m.reduce_αs |> cpu)
-    push!(hist.activations, m.activations |> cpu)
-    push!(hist.accuracies, accuracy_batched(m, val |> gpu))
+    push!(hist.activations, m.activations.activations |> cpu)
+    #push!(hist.accuracies, accuracy_batched(m, val))
 end
 histepoch = histories([],[],[],[])
 histbatch = histories([],[],[],[])
@@ -84,7 +84,7 @@ end
 CbAll(cbs...) = CbAll(cbs)
 
 (cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
-cbepoch = CbAll(acccb, histepoch, save_progress)
-cbbatch = CbAll(throttled_losscb, histbatch)
+cbepoch = CbAll(histepoch, save_progress)
+cbbatch = histbatch
 
 Flux.@epochs 10 DARTStrain1st!(loss, m, train, val, optimizer_α, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)

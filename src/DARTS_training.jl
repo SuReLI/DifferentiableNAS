@@ -40,7 +40,11 @@ all_ws(model::DARTSModel) = Flux.params([model.stem, model.cells..., model.globa
 function DARTStrain1st!(loss, model, train, val, opt_α, opt_w; cbepoch = () -> (), cbbatch = () -> ())
     function grad_loss(model, ps, batch, verbose = false)
         gs = gradient(ps) do
-            loss(model, batch...)
+            my_loss = loss(model, batch...)
+            Zygote.@ignore begin
+                #@show my_loss
+            end
+            my_loss
         end
     end
 

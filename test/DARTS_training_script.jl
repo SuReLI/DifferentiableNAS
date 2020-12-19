@@ -20,11 +20,11 @@ include("CIFAR10.jl")
     test_fraction::Float32 = 1.0
 end
 
-argparams = trial_params(trainval_fraction = 0.01)
+argparams = trial_params(batchsize = 16)
 
 num_ops = length(PRIMITIVES)
 
-m = DARTSModel(α_init = (num_ops -> ones(num_ops) |> f32), num_cells = 3, channels = 4) |> gpu
+m = DARTSModel(α_init = (num_ops -> ones(num_ops) |> f32), num_cells = 4, channels = 4) |> gpu
 
 
 losscb() = @show(loss(m, test[1] |> gpu, test[2] |> gpu))
@@ -32,10 +32,12 @@ throttled_losscb = throttle(losscb, argparams.throttle_)
 function loss(m, x, y)
     #x_g = x |> gpu
     #y_g = y |> gpu
-    logitcrossentropy(squeeze(m(x)), y)
+    out = m(x)#|>gpu)
+    #@show(mean(onecold(out, 1:10) .== onecold(y_g, 1:10)))
+    logitcrossentropy(squeeze(out), y)
 end
 
-acccb() = @show(accuracy_batched(m, val |> gpu))
+acccb() = @show(accuracy_batched(m, val))
 function accuracy(m, x, y; pert = [])
     x_g = x |> gpu
     y_g = y |> gpu
@@ -45,11 +47,12 @@ function accuracy_batched(m, xy; pert = [])
     score = 0.0
     count = 0
     for batch in xy
-        acc = accuracy(m, batch..., pert = pert)
-        println(acc)
+        batch_gpu = batch |> gpu
+        acc = accuracy(m, batch_gpu..., pert = pert)
         score += acc*length(batch)
         count += length(batch)
     end
+    @show score / count
     score / count
 end
 
@@ -71,7 +74,7 @@ function (hist::histories)()
     push!(hist.normal_αs, m.normal_αs |> cpu)
     push!(hist.reduce_αs, m.reduce_αs |> cpu)
     push!(hist.activations, m.activations |> cpu)
-    push!(hist.accuracies, accuracy_batched(m, val |> gpu))
+    #push!(hist.accuracies, accuracy_batched(m, val))
 end
 histepoch = histories([],[],[],[])
 histbatch = histories([],[],[],[])
@@ -86,8 +89,8 @@ end
 CbAll(cbs...) = CbAll(cbs)
 
 (cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
-cbepoch = CbAll(acccb, histepoch, save_progress)
-cbbatch = CbAll(throttled_losscb, histbatch)
+cbepoch = CbAll(histepoch, save_progress)
+cbbatch = histbatch
 
 Flux.@epochs 1 DARTStrain1st!(loss, m, train, val, optimizer_α, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)
 

@@ -1,4 +1,4 @@
-export PRIMITIVES, uniform_α, DARTSModel, Cell, MixedOp, DARTSEvalModel, α14, MaskedDARTSModel
+export PRIMITIVES, DARTSModel, Cell, MixedOp, DARTSEvalModel, MaskedDARTSModel
 
 using Flux
 using Base.Iterators
@@ -6,9 +6,7 @@ using StatsBase: mean
 using Zygote
 using LinearAlgebra
 using CUDA
-using JuliennedArrays
-using Zygote: @adjoint, _zero
-using SliceMap
+using Zygote: @adjoint
 
 
 ReLUConvBN(channels_in, channels_out, kernel_size, stride, pad) = Chain(
@@ -171,8 +169,6 @@ struct MixedOp
     ops::AbstractArray
 end
 
-#add "hook" after each op here?
-
 MixedOp(name::String, channels::Int64, stride::Int64) = MixedOp(name, [Op(string(name, "-", prim), OPS[prim](channels, stride, 1) |> gpu) for prim in PRIMITIVES]) |> gpu
 
 function mask(row::Int64, shape::AbstractArray)
@@ -199,39 +195,6 @@ collecteachrow(x) = collect(eachrow(x))
         (dx,)
     end
 end
-
-"""
-@adjoint function mapreduce(op, func, xs; kwargs...)
-    opbacks = Any[]
-    backs = Any[]
-    ys = Any[]
-    function nop(x)
-        y, back = pullback(op,x)
-        push!(opbacks, back)
-        y
-    end
-    function nfunc(x, x2)
-        y, back = pullback(func, x, x2)
-        push!(backs, back)
-        push!(ys, y)
-        return y
-    end
-    mapreduce(nop, nfunc, xs; kwargs...),
-    function (adjy)
-        offset = haskey(kwargs, :init) ? 0 : 1
-        res = Vector{Any}(undef, length(ys)+offset)
-        for i=length(ys):-1:1
-            opback, back, y = opbacks[i+offset], backs[i], ys[i]
-            adjy, adjthis = back(adjy)
-            res[i+offset], = opback(adjthis)
-        end
-        if offset==1
-            res[1], = opbacks[1](adjy)
-        end
-        return (nothing, nothing, res)
-    end
-end
-"""
 
 struct Cell
     steps::Int64
@@ -268,17 +231,10 @@ function (m::Cell)(x1, x2, αs; acts = Dict())
 
     states[1] = state1
     states[2] = state2
-    # states[3] = m.mixedops[1](states[1],αs.α1) + m.mixedops[2](states[2],αs.α2)
-    # states[4] = m.mixedops[3](states[1],αs.α3) + m.mixedops[4](states[2],αs.α4) + m.mixedops[5](states[3],αs.α5)
-    # states[5] = m.mixedops[6](states[1],αs.α6) + m.mixedops[7](states[2],αs.α7) + m.mixedops[8](states[3],αs.α8) + m.mixedops[9](states[4],αs.α9)
-    # states[6] = m.mixedops[10](states[1],αs.α10) + m.mixedops[11](states[2],αs.α11) + m.mixedops[12](states[3],αs.α12) + m.mixedops[13](states[4],αs.α13) + m.mixedops[14](states[5],αs.α14)
-    #
     offset = 0
-    #mo_α = collect(zip(m.mixedops, collect(eachrow(αs))))
     for step in 1:m.steps
         state = mapreduce((mixedop, α, previous_state) -> mixedop(previous_state, α, acts = acts), +, m.mixedops[offset+1:offset+step+1], αs[offset+1:offset+step+1], states)
         offset += step + 1
-        #states[step+2] = sum(to_sum)
         states[step+2] = state
     end
     states_ = copy(states)
@@ -287,26 +243,9 @@ end
 
 Flux.@functor Cell
 
-struct α14
-    α1::AbstractArray
-    α2::AbstractArray
-    α3::AbstractArray
-    α4::AbstractArray
-    α5::AbstractArray
-    α6::AbstractArray
-    α7::AbstractArray
-    α8::AbstractArray
-    α9::AbstractArray
-    α10::AbstractArray
-    α11::AbstractArray
-    α12::AbstractArray
-    α13::AbstractArray
-    α14::AbstractArray
+mutable struct Activations
+    activations::Dict
 end
-
-α14() = α14([2e-3*(rand(length(PRIMITIVES)).-0.5) |> f32 |> gpu  for _ in 1:14]...)
-
-Flux.@functor α14
 
 struct DARTSModel
     normal_αs::AbstractArray
@@ -315,7 +254,7 @@ struct DARTSModel
     cells::AbstractArray
     global_pooling::AdaptiveMeanPool
     classifier::Dense
-    activations::Dict
+    activations::Activations
 end
 
 function DARTSModel(; α_init = (num_ops -> 2e-3*(rand(num_ops).-0.5) |> f32), num_classes = 10, num_cells = 8, channels = 16, steps = 4, mult = 4, stem_mult = 3)
@@ -342,16 +281,13 @@ function DARTSModel(; α_init = (num_ops -> 2e-3*(rand(num_ops).-0.5) |> f32), n
         channels_before_last = channels_last
         channels_last = mult*channels_current
     end
-
     global_pooling = AdaptiveMeanPool((1,1)) |> gpu
     classifier = Dense(channels_last, num_classes) |> gpu
     k = floor(Int, steps^2/2+3*steps/2)
-    #α_normal = α14()
-    #α_reduce = α14()
     num_ops = length(PRIMITIVES)
     α_normal = [α_init(num_ops) for _ in 1:k]
     α_reduce = [α_init(num_ops) for _ in 1:k]
-    DARTSModel(α_normal, α_reduce, stem, cells, global_pooling, classifier, Dict())
+    DARTSModel(α_normal, α_reduce, stem, cells, global_pooling, classifier, Activations(Dict()))
 end
 
 
@@ -362,7 +298,7 @@ function MaskedDARTSModel(m::DARTSModel; normal_αs = [], reduce_αs = [])
     if length(reduce_αs) == 0
         reduce_αs = m.reduce_αs
     end
-    DARTSModel(normal_αs, reduce_αs, m.stem, m.cells, m.global_pooling, m.classifier)
+    DARTSModel(normal_αs, reduce_αs, m.stem, m.cells, m.global_pooling, m.classifier, Activations(Dict()))
 end
 
 function (m::DARTSModel)(x)
@@ -375,7 +311,7 @@ function (m::DARTSModel)(x)
         s1 = s2
         s2 = new_state
     end
-    m.activations = acts
+    m.activations.activations = acts
     out = m.global_pooling(s2)
     m.classifier(squeeze(out))
 end
@@ -396,6 +332,7 @@ function (m::DARTSModel)(x; normal_αs = [], reduce_αs = [])
         s2 = new_state
     end
     out = m.global_pooling(s2)
+    #m.activations.activations = acts
     m.classifier(squeeze(out))
 end
 

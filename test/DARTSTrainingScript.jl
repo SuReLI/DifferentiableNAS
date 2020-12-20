@@ -20,7 +20,7 @@ include("CIFAR10.jl")
     test_fraction::Float32 = 1.0
 end
 
-argparams = trial_params(batchsize = 32)
+argparams = trial_params(trainval_fraction = 0.01, batchsize = 32)
 
 num_ops = length(PRIMITIVES)
 
@@ -31,10 +31,10 @@ throttled_losscb = throttle(losscb, argparams.throttle_)
 function loss(m, x, y)
     #x_g = x |> gpu
     #y_g = y |> gpu
-    logitcrossentropy(squeeze(m(x)), y)
+    @show logitcrossentropy(squeeze(m(x)), y)
 end
 
-acccb() = @show(accuracy_batched(m, val |> gpu))
+acccb() = @show(accuracy_batched(m, val))
 function accuracy(m, x, y; pert = [])
     x_g = x |> gpu
     y_g = y |> gpu
@@ -49,7 +49,7 @@ function accuracy_batched(m, xy; pert = [])
         score += acc*length(batch)
         count += length(batch)
     end
-    score / count
+    @show score / count
 end
 
 optimizer_α = ADAM(3e-4,(0.9,0.999))
@@ -66,9 +66,12 @@ Base.@kwdef mutable struct histories
 end
 
 function (hist::histories)()
+    display("begin histories")
     push!(hist.normal_αs, m.normal_αs |> cpu)
     push!(hist.reduce_αs, m.reduce_αs |> cpu)
+    display("alphas recorded")
     push!(hist.activations, m.activations.activations |> cpu)
+    display("activations recorded")
     #push!(hist.accuracies, accuracy_batched(m, val))
 end
 histepoch = histories([],[],[],[])

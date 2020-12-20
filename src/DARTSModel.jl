@@ -329,7 +329,7 @@ function (m::DARTSModel)(x; normal_αs = [], reduce_αs = [])
     s2 = m.stem(x)
     for (i, cell) in enumerate(m.cells)
         cell.reduction ? αs = reduce_αs : αs = normal_αs
-        new_state = cell(s1, s2, αs, acts)
+        new_state = cell(s1, s2, αs, acts = acts)
         s1 = s2
         s2 = new_state
     end

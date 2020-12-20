@@ -20,21 +20,21 @@ include("CIFAR10.jl")
     test_fraction::Float32 = 1.0
 end
 
-argparams = trial_params()
+argparams = trial_params(batchsize = 32)
 
 num_ops = length(PRIMITIVES)
 
-m = DARTSModel() |> gpu
+m = DARTSModel(num_cells = 5) |> gpu
 
 losscb() = @show(loss(m, test[1] |> gpu, test[2] |> gpu))
 throttled_losscb = throttle(losscb, argparams.throttle_)
 function loss(m, x, y)
     #x_g = x |> gpu
     #y_g = y |> gpu
-    logitcrossentropy(squeeze(m(x)), y)
+    @show logitcrossentropy(squeeze(m(x)), y)
 end
 
-acccb() = @show(accuracy_batched(m, val |> gpu))
+acccb() = @show(accuracy_batched(m, val))
 function accuracy(m, x, y; pert = [])
     x_g = x |> gpu
     y_g = y |> gpu
@@ -49,7 +49,7 @@ function accuracy_batched(m, xy; pert = [])
         score += acc*length(batch)
         count += length(batch)
     end
-    score / count
+    @show score / count
 end
 
 optimizer_α = ADAM(3e-4,(0.9,0.999))
@@ -59,10 +59,13 @@ train, val = get_processed_data(argparams.val_split, argparams.batchsize, argpar
 test = get_test_data(argparams.test_fraction)
 
 function (hist::histories)()
+    display("begin histories")
     push!(hist.normal_αs, m.normal_αs |> cpu)
     push!(hist.reduce_αs, m.reduce_αs |> cpu)
+    display("alphas recorded")
     push!(hist.activations, m.activations.activations |> cpu)
-    push!(hist.accuracies, accuracy_batched(m, val |> gpu))
+    display("activations recorded")
+    #push!(hist.accuracies, accuracy_batched(m, val))
 end
 histepoch = histories([],[],[],[])
 histbatch = histories([],[],[],[])
@@ -82,7 +85,7 @@ end
 CbAll(cbs...) = CbAll(cbs)
 
 (cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
-cbepoch = CbAll(acccb, histepoch, save_progress)
-cbbatch = CbAll(throttled_losscb, histbatch)
+cbepoch = CbAll(histepoch, save_progress)
+cbbatch = histbatch
 
 Flux.@epochs 10 DARTStrain1st!(loss, m, train, val, optimizer_α, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)

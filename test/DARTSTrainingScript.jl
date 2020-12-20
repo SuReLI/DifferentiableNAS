@@ -20,7 +20,7 @@ include("CIFAR10.jl")
     test_fraction::Float32 = 1.0
 end
 
-argparams = trial_params(trainval_fraction = 0.01, batchsize = 32)
+argparams = trial_params(batchsize = 32)
 
 num_ops = length(PRIMITIVES)
 

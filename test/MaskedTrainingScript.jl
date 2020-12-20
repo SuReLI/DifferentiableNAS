@@ -20,7 +20,9 @@ include("CIFAR10.jl")
     test_fraction::Float32 = 1.0
 end
 
-argparams = trial_params(split_r = 0.2)
+argparams = trial_params(val_split = 0.2, batchsize = 32)
+
+m = DARTSModel(num_cells = 5) |> gpu
 
 num_ops = length(PRIMITIVES)
 
@@ -82,8 +84,11 @@ end
 CbAll(cbs...) = CbAll(cbs)
 
 (cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
-cbepoch = CbAll(acccb, histepoch, save_progress)
-cbbatch = CbAll(throttled_losscb, histbatch)
+cbepoch = CbAll(histepoch, save_progress)
+cbbatch = histbatch
 
-BSON.@load "test/models/pretrainedmaskprogress2020-12-19T13:59:31.902.bson" m histepoch histbatch
+#BSON.@load "test/models/pretrainedmaskprogress2020-12-19T13:59:31.902.bson" m histepoch histbatch
+#m = m |> gpu
+#Flux.@epochs 2 DARTStrain1st!(loss, m, train, val, optimizer_α, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)
+
 Flux.@epochs 10 Maskedtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)

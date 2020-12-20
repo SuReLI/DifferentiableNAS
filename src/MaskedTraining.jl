@@ -42,7 +42,7 @@ function perturb(αs::AbstractArray)
     perturbs = [copy(αs) for i in inds]
     for i in 1:length(inds)
         perturbs[i] = deepcopy(αs)
-        perturbs[i][row][inds[i]] = 0.0
+        perturbs[i][row][inds[i]] = -Inf32
     end
     #display(inds)
     (row, inds, perturbs)
@@ -67,7 +67,7 @@ function Standardtrain1st!(accuracy, loss, model, train, val, opt; cb = () -> ()
 end
 
 
-function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cb = () -> ())
+function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () -> (), cbbatch = () -> ())
     function grad_loss(model, ps, batch, verbose = false)
         gs = gradient(ps) do
             loss(model, batch...)
@@ -80,15 +80,15 @@ function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cb = () -> ())
         t_gpu = train_batch |> gpu
         gsw = grad_loss(model, w, t_gpu)
         Flux.Optimise.update!(opt, w, gsw)
-        cb()
+        cbbatch()
     end
 
     row, inds, perturbs = perturb(model.normal_αs)
     vals = [accuracy(model, val, pert = pert) for pert in perturbs]
     model.normal_αs[row][findmax(vals)[2]] = 0
-    display(row, model.normal_αs[row])
+    display(row, softmax(model.normal_αs[row]))
 
-    cb()
+    cbepoch()
 end
 
 

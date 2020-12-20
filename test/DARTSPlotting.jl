@@ -30,26 +30,27 @@ BSON.@load file_name m histepoch histbatch
 
 connects = vcat([[(j,i) for j = 1:i-1] for i = 3:6]...)
 
+
 n_y_min = minimum([softmax(a[i])[j] for a in histbatch.normal_αs for i in 1:14 for j in 1:8])
 n_y_max = maximum([softmax(a[i])[j] for a in histbatch.normal_αs for i in 1:14 for j in 1:8])
 p = Vector(undef, 14)
 for i = 1:14
-    p[i] = plot(title = string("Op ",connects[i][1],"->",connects[i][2]), legend = :outertopright)
+    p[i] = plot(title = string("Op ",connects[i][1],"->",connects[i][2]), ylim=(n_y_min,n_y_max), legend=false)
     for j = 1:8
-        plot!([softmax(a[i])[j] for a in histbatch.normal_αs], xlabel="Batch", ylabel="alpha", label=PRIMITIVES[j], ylim=(n_y_min,n_y_max))
+        plot!([softmax(a[i])[j] for a in histbatch.normal_αs], label=PRIMITIVES[j])
     end
 end
-gui(plot(p..., layout = (7,2), size = (2000,2000)))
+gui(plot(p..., layout = (2,7), size = (2200,600)))
 savefig("test/models/fig_n.png")
 
 r_y_min = minimum([softmax(a[i])[j] for a in histbatch.reduce_αs for i in 1:14 for j in 1:8])
 r_y_max = maximum([softmax(a[i])[j] for a in histbatch.reduce_αs for i in 1:14 for j in 1:8])
 p = Vector(undef, 14)
 for i = 1:14
-    p[i] = plot(title = string("Op ",connects[i][1],"->",connects[i][2]), legend = :outertopright, xlabel="Batch", ylabel="alpha", ylim=(r_y_min,r_y_max))
+    p[i] = plot(title = string("Op ",connects[i][1],"->",connects[i][2]), ylim=(r_y_min,r_y_max), legend=false)
     for j = 1:8
         plot!([softmax(a[i])[j] for a in histbatch.reduce_αs], label=PRIMITIVES[j])
     end
 end
-gui(plot(p..., layout = (7,2), size = (2000,2000)))
+gui(plot(p..., layout = (2,7), size = (2200,600)))
 savefig("test/models/fig_r.png")

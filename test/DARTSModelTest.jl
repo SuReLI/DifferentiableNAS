@@ -37,10 +37,6 @@ end
 end
 
 @testset "DARTS Model" begin
-    steps = 4
-    k = floor(Int, steps^2/2+3*steps/2)
-    @test k == (steps+1)*(steps+2)/2-1
-    num_ops = length(PRIMITIVES)
     m = DARTSModel() |> gpu
     @test length(Flux.params(m).order) > 1
     @test length(all_αs(m).order) == 2*k

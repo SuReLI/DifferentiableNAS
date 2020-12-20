@@ -9,13 +9,9 @@ include("CIFAR10.jl")
 @nograd softmax
 
 @testset "DARTS training test" begin
-    steps = 4
-    k = floor(Int, steps^2/2+3*steps/2)
-    num_ops = length(PRIMITIVES)
-
-    m = DARTSModel() |> gpu
+    m = DARTSModel(num_cells = 4, channels = 4) |> gpu
     batchsize = 64
-    throttle_ = 2
+    throttle_ = 10
     splitr = 0.5
     evalcb = throttle(() -> @show(loss(m, test[1] |> gpu, test[2] |> gpu)), throttle_)
     function loss(m, x, y)

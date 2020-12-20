@@ -74,16 +74,18 @@ histbatch = histories([],[],[],[])
 
 datesnow = Dates.now()
 trial_file = string("test/models/masktrain", datesnow, ".bson")
-save_progress() = BSON.@save trial_file m histepoch histbatch argparams optimizer_α optimizer_w
-
+function save_progress()
+    m_cpu = m |> cpu
+    BSON.@save trial_file m_cpu histepoch histbatch argparams optimizer_α optimizer_w
+end
 struct CbAll
     cbs
 end
 CbAll(cbs...) = CbAll(cbs)
 
 (cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
-cbepoch = CbAll(acccb, histepoch, save_progress)
-cbbatch = CbAll(throttled_losscb, histbatch)
+cbepoch = CbAll(histepoch, save_progress)
+cbbatch = histbatch
 
 BSON.@load "test/models/pretrainedmaskprogress2020-12-19T13:59:31.902.bson" m histepoch histbatch
 Flux.@epochs 10 Maskedtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)

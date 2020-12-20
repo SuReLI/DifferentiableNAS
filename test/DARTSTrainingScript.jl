@@ -79,7 +79,8 @@ histbatch = histories([],[],[],[])
 
 datesnow = Dates.now()
 trial_file = string("test/models/pretrainedmaskprogress", datesnow, ".bson")
-save_progress() = BSON.@save trial_file m histepoch histbatch argparams
+save_progress() = BSON.@save trial_file m histepoch histbatch argparams optimizer_α optimizer_w
+
 
 struct CbAll
     cbs

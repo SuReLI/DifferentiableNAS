@@ -348,6 +348,7 @@ struct EvalCell
     prelayer1::Chain
     prelayer2::Chain
     ops::AbstractArray
+    inputindices::AbstractArray
 end
 
 function maxk(a, k)
@@ -365,15 +366,15 @@ function EvalCell(channels_before_last, channels_last, channels, reduce, reduce_
     ops = []
     inputindices = []
     rows = 0
-    for i = 3:steps+2 #TODO test this loop
+    for i = 3:steps+2 #TODO test this loop, make sure it's not none
         options = [findmax(αs[rows+j]) for j = 1:i-1]
         top2 = partialsortperm(options, 1:2, by = x -> x[1], rev=true)
-        top2ops = (OPS[PRIMITIVES[options[i][2]]](channels, reduce && i < 3 ? 2 : 1, 1) for i in top2)
+        top2ops = Tuple(OPS[PRIMITIVES[options[i][2]]](channels, reduce && i < 3 ? 2 : 1, 1) for i in top2)
         push!(inputindices, top2)
         push!(ops, top2ops)
         rows += i-1
     end
-    EvalCell(steps, reduce, multiplier, prelayer1, prelayer2, ops)
+    EvalCell(steps, reduce, multiplier, prelayer1, prelayer2, ops, inputindices)
 end
 
 function (m::EvalCell)(x1, x2)
@@ -384,9 +385,8 @@ function (m::EvalCell)(x1, x2)
 
     states[1] = state1
     states[2] = state2
-    offset = 0
     for step in 1:m.steps
-        state = mapreduce((op, state) -> op(state), +, m.ops[offset+1:offset+step+1], states)
+        state = ops[step][1](states[])
         offset += step + 1
         states[step+2] = state
     end

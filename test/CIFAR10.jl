@@ -28,7 +28,7 @@ end
 function get_processed_data(splitr = 0.5, batchsize = 64, mini = 1.0)
     # Fetching the train and validation data and getting them into proper shape
     total_img = Int(floor(40000*mini))
-    X = trainimgs(CIFAR10)
+    X = shuffle(trainimgs(CIFAR10))
     imgs = [getarray(X[i].img) for i in 1:total_img]
     labels = Matrix(onehotbatch([X[i].ground_truth.class for i in 1:total_img],1:10))
     train_pop = Int(floor((1-splitr)* total_img))

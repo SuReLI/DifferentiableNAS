@@ -51,6 +51,7 @@ function accuracy_batched(m, xy; pert = [])
         println(acc)
         score += acc*length(batch)
         count += length(batch)
+        CUDA.reclaim()
     end
     score / count
 end

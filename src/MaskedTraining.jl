@@ -85,14 +85,15 @@ function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () ->
         #t_gpu = train_batch |> gpu
         gsw = grad_loss(model, w, train_batch)
         Flux.Optimise.update!(opt, w, gsw)
+        CUDA.reclaim()
         cbbatch()
     end
 
     row, inds, perturbs = perturb(model.normal_αs)
     vals = [accuracy(model, val, pert = pert) for pert in perturbs]
-    model.normal_αs[row][findmax(vals)[2]] = 0
+    model.normal_αs[row][findmax(vals)[2]] = -Inf32
     display((row, softmax(model.normal_αs[row])))
-
+    CUDA.reclaim()
     cbepoch()
 end
 

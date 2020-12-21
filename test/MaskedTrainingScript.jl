@@ -20,7 +20,7 @@ include("CIFAR10.jl")
     test_fraction::Float32 = 1.0
 end
 
-argparams = trial_params(val_split = 0.2, batchsize = 32)
+argparams = trial_params(trainval_fraction = 0.005, val_split = 0.2, batchsize = 32)
 
 m = DARTSModel(num_cells = 5) |> gpu
 
@@ -31,23 +31,27 @@ throttled_losscb = throttle(losscb, argparams.throttle_)
 function loss(m, x, y)
     #x_g = x |> gpu
     #y_g = y |> gpu
-    logitcrossentropy(squeeze(m(x)), y)
+    @show logitcrossentropy(squeeze(m(x)), y)
 end
 
 acccb() = @show(accuracy_batched(m, val |> gpu))
 function accuracy(m, x, y; pert = [])
-    x_g = x |> gpu
-    y_g = y |> gpu
-    mean(onecold(m(x_g, normal_αs = pert), 1:10) .== onecold(y_g, 1:10))
+    #x_g = x |> gpu
+    #y_g = y |> gpu
+    #display(typeof(x_g))
+    #display(typeof(y_g))
+    out = mean(onecold(m(x, normal_αs = pert), 1:10) .== onecold(y, 1:10))
+    #CUDA.
 end
 function accuracy_batched(m, xy; pert = [])
     score = 0.0
     count = 0
-    for batch in xy
+    for batch in CuIterator(xy)
         acc = accuracy(m, batch..., pert = pert)
         println(acc)
         score += acc*length(batch)
         count += length(batch)
+        CUDA.reclaim()
     end
     score / count
 end
@@ -68,8 +72,8 @@ end
 function (hist::histories)()
     push!(hist.normal_αs, m.normal_αs |> cpu)
     push!(hist.reduce_αs, m.reduce_αs |> cpu)
-    push!(hist.activations, m.activations.activations |> cpu)
-    push!(hist.accuracies, accuracy_batched(m, val |> gpu))
+    #push!(hist.activations, m.activations.activations |> cpu)
+    #push!(hist.accuracies, accuracy_batched(m, val |> gpu))
 end
 histepoch = histories([],[],[],[])
 histbatch = histories([],[],[],[])

@@ -148,13 +148,13 @@ end
 function showlayer(x, layer, outs)
     out = layer(x)
     Zygote.ignore() do
-        push!(outs, out |> cpu)
+        push!(outs, mean(out |> cpu))
     end
     out
 end
 
 function(opwrap::Op)(x; acts::Dict = Dict())
-    outs = Array{typeof(x |> cpu)}(undef, 0)
+    outs = Array{Float32}(undef, 0)
     out = foldl((x, layer) -> showlayer(x, layer, outs), opwrap.op, init = x)
     Zygote.ignore() do
         acts[opwrap.name] = outs

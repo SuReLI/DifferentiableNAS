@@ -58,7 +58,7 @@ function Standardtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () 
     w = all_ws(model)
 
     for train_batch in CuIterator(train)
-        gsw = grad_loss(model, w, t_gpu)
+        gsw = grad_loss(model, w, train_batch)
         Flux.Optimise.update!(opt, w, gsw)
         cbbatch()
     end

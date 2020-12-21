@@ -36,7 +36,7 @@ end
 
 acccb() = @show(accuracy_batched(m, val |> gpu))
 function accuracy(m, x, y; pert = [])
-    out = mean(onecold(m(x, normal_αs = pert), 1:10) .== onecold(y, 1:10))
+    out = mean(onecold(m(x, αs = pert), 1:10) .== onecold(y, 1:10))
 end
 function accuracy_batched(m, xy; pert = [])
     CUDA.reclaim()

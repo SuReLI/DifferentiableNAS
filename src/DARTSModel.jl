@@ -318,12 +318,11 @@ end
 
 function (m::DARTSModel)(x; αs = [[],[]])
     acts = Dict()
-    normal_αs = αs[1]
-    reduce_αs = αs[2]
-    if length(normal_αs) == 0
+    if length(αs) > 0
+        normal_αs = αs[1]
+        reduce_αs = αs[2]
+    else
         normal_αs = m.normal_αs
-    end
-    if length(reduce_αs) == 0
         reduce_αs = m.reduce_αs
     end
     acts = Dict()

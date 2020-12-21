@@ -36,23 +36,19 @@ end
 
 acccb() = @show(accuracy_batched(m, val |> gpu))
 function accuracy(m, x, y; pert = [])
-    #x_g = x |> gpu
-    #y_g = y |> gpu
-    #display(typeof(x_g))
-    #display(typeof(y_g))
     out = mean(onecold(m(x, normal_αs = pert), 1:10) .== onecold(y, 1:10))
-    #CUDA.
 end
 function accuracy_batched(m, xy; pert = [])
+    CUDA.reclaim()
     score = 0.0
     count = 0
     for batch in CuIterator(xy)
         acc = accuracy(m, batch..., pert = pert)
-        println(acc)
         score += acc*length(batch)
         count += length(batch)
         CUDA.reclaim()
     end
+    display(score / count)
     score / count
 end
 
@@ -72,8 +68,8 @@ end
 function (hist::histories)()
     push!(hist.normal_αs, m.normal_αs |> cpu)
     push!(hist.reduce_αs, m.reduce_αs |> cpu)
-    #push!(hist.activations, m.activations.activations |> cpu)
-    #push!(hist.accuracies, accuracy_batched(m, val |> gpu))
+    push!(hist.activations, m.activations.activations |> cpu)
+    push!(hist.accuracies, accuracy_batched(m, val))
 end
 histepoch = histories([],[],[],[])
 histbatch = histories([],[],[],[])
@@ -90,8 +86,8 @@ end
 CbAll(cbs...) = CbAll(cbs)
 
 (cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
-cbepoch = CbAll(histepoch, save_progress)
-cbbatch = histbatch
+cbepoch = CbAll(CUDA.reclaim, histepoch, save_progress, CUDA.reclaim)
+cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)
 
 #BSON.@load "test/models/pretrainedmaskprogress2020-12-19T13:59:31.902.bson" m histepoch histbatch
 #m = m |> gpu

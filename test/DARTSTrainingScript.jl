@@ -29,25 +29,22 @@ m = DARTSModel(num_cells = 5) |> gpu
 losscb() = @show(loss(m, test[1] |> gpu, test[2] |> gpu))
 throttled_losscb = throttle(losscb, argparams.throttle_)
 function loss(m, x, y)
-    #x_g = x |> gpu
-    #y_g = y |> gpu
     @show logitcrossentropy(squeeze(m(x)), y)
 end
 
 acccb() = @show(accuracy_batched(m, val))
 function accuracy(m, x, y; pert = [])
-    x_g = x |> gpu
-    y_g = y |> gpu
-    mean(onecold(m(x_g, normal_αs = pert), 1:10) .== onecold(y_g, 1:10))
+    mean(onecold(m(x, normal_αs = pert), 1:10) .== onecold(y, 1:10))
 end
 function accuracy_batched(m, xy; pert = [])
+    CUDA.reclaim()
     score = 0.0
     count = 0
-    for batch in xy
+    for batch in CuIterator(xy)
         acc = accuracy(m, batch..., pert = pert)
-        println(acc)
         score += acc*length(batch)
         count += length(batch)
+        CUDA.reclaim()
     end
     @show score / count
 end
@@ -85,7 +82,7 @@ end
 CbAll(cbs...) = CbAll(cbs)
 
 (cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
-cbepoch = CbAll(histepoch, save_progress)
-cbbatch = histbatch
+cbepoch = CbAll(CUDA.reclaim, histepoch, save_progress, CUDA.reclaim)
+cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)
 
 Flux.@epochs 10 DARTStrain1st!(loss, m, train, val, optimizer_α, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)

@@ -38,17 +38,17 @@ all_ws(model::DARTSModel) = Flux.params([model.stem, model.cells..., model.globa
 
 function perturb(αs::AbstractArray)
     row = rand(1:length(αs))
-    inds = findall(αs[row] .> 0)
+    inds = findall(softmax(αs[row]) .> 0)
     perturbs = [copy(αs) for i in inds]
     for i in 1:length(inds)
         perturbs[i] = deepcopy(αs)
         perturbs[i][row][inds[i]] = -Inf32
     end
-    #display(inds)
+    display(inds)
     (row, inds, perturbs)
 end
 
-function Standardtrain1st!(accuracy, loss, model, train, val, opt; cb = () -> ())
+function Standardtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () -> (), cbbatch = () -> ())
     function grad_loss(model, ps, batch, verbose = false)
         gs = gradient(ps) do
             loss(model, batch...)
@@ -61,17 +61,21 @@ function Standardtrain1st!(accuracy, loss, model, train, val, opt; cb = () -> ()
         t_gpu = train_batch |> gpu
         gsw = grad_loss(model, w, t_gpu)
         Flux.Optimise.update!(opt, w, gsw)
-        cb()
+        CUDA.reclaim()
+        cbbatch()
+        CUDA.reclaim()
     end
-    cb()
+    CUDA.reclaim()
+    cbepoch()
+    CUDA.reclaim()
 end
 
-function unsafe_free!(y::Flux.OneHotMatrix{AbstractArray{Flux.OneHotVector,1}}) 
+function unsafe_free!(y::Flux.OneHotMatrix{AbstractArray{Flux.OneHotVector,1}})
     for c in y
         unsafe_free!(c)
     end
 end
-                           
+
 function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () -> (), cbbatch = () -> ())
     function grad_loss(model, ps, batch, verbose = false)
         gs = gradient(ps) do
@@ -87,6 +91,7 @@ function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () ->
         Flux.Optimise.update!(opt, w, gsw)
         CUDA.reclaim()
         cbbatch()
+        CUDA.reclaim()
     end
 
     row, inds, perturbs = perturb(model.normal_αs)
@@ -95,6 +100,7 @@ function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () ->
     display((row, softmax(model.normal_αs[row])))
     CUDA.reclaim()
     cbepoch()
+    CUDA.reclaim()
 end
 
 

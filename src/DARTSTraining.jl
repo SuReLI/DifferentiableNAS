@@ -51,18 +51,15 @@ function DARTStrain1st!(loss, model, train, val, opt_α, opt_w; cbepoch = () -> 
     w = all_ws(model)
     α = all_αs(model)
 
-    #cb = runall(cb)
-    #@progress
-    for (train_batch, val_batch) in zip(train, val)
-        v_gpu = val_batch |> gpu
-        gsα = grad_loss(model, α, v_gpu)
-        Flux.Optimise.update!(opt_α, α, gsα)
-        #CUDA.unsafe_free!(v_gpu[1])
 
-        t_gpu = train_batch |> gpu
-        gsw = grad_loss(model, w, t_gpu)
+    for (train_batch, val_batch) in zip(CuIterator(train), CuIterator(val))
+        gsα = grad_loss(model, α,  val_batch)
+        Flux.Optimise.update!(opt_α, α, gsα)
+        CUDA.reclaim()
+
+        gsw = grad_loss(model, w, train_batch)
         Flux.Optimise.update!(opt_w, w, gsw)
-        #CUDA.unsafe_free!(t_gpu[1])
+        CUDA.reclaim()
         cbbatch()
     end
     cbepoch()
@@ -81,9 +78,7 @@ function DARTStrain2nd!(loss, model, train, val, opt; cb = () -> ())
     w = all_ws(model)
     α = all_αs(model)
 
-    cb = runall(cb)
-    #@progress
-    for (train_batch, val_batch) in zip(train, val)
+    for (train_batch, val_batch) in zip(CuIterator(train), CuIterator(val))
         gsα = grad_loss(model, α, val_batch)
         model_prime = deepcopy(model)
         model_prime_α = deepcopy(model_prime)
@@ -152,11 +147,14 @@ function DARTSevaltrain1st!(loss, model, train, opt_w; cb = () -> ())
 
     w = all_ws(model)
 
-    for train_batch in train
-        t_gpu = train_batch |> gpu
-        gsw = grad_loss(model, w, t_gpu)
+    for train_batch in CuIterator(train)
+        gsw = grad_loss(model, w, train_batch)
         Flux.Optimise.update!(opt_w, w, gsw)
-        #CUDA.unsafe_free!(t_gpu[1])
+        CUDA.reclaim()
+        cbbatch()
+        CUDA.reclaim()
     end
-    cb()
+    CUDA.reclaim()
+    cbepoch()
+    CUDA.reclaim()
 end

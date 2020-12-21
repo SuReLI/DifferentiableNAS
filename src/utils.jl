@@ -1,4 +1,4 @@
-export squeeze
+export squeeze, histories
 
 function squeeze(A::AbstractArray) #generalize this? move to utils?
     if ndims(A) == 3
@@ -23,4 +23,11 @@ function all_params(submodels)
         Flux.params!(ps, submodel)
     end
     return ps
+end
+
+Base.@kwdef mutable struct histories
+    normal_αs::Vector{Vector{Array{Float32, 1}}}
+    reduce_αs::Vector{Vector{Array{Float32, 1}}}
+    activations::Vector{Any}
+    accuracies::Vector{Float32}
 end

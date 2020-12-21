@@ -18,13 +18,6 @@ include("CIFAR10.jl")
     test_fraction::Float32 = 1.0
 end
 
-Base.@kwdef mutable struct histories
-    normal_αs::Vector{Vector{Array{Float32, 1}}}
-    reduce_αs::Vector{Vector{Array{Float32, 1}}}
-    activations::Vector{Any}
-    accuracies::Vector{Float32}
-end
-
 file_name = "test/models/pretrainedmaskprogress2020-12-19T13:59:31.902.bson"
 BSON.@load file_name m histepoch histbatch
 

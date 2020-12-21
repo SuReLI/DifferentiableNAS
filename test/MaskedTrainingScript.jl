@@ -80,8 +80,10 @@ histbatch = histories([],[],[],[])
 
 datesnow = Dates.now()
 trial_file = string("test/models/masktrain", datesnow, ".bson")
-save_progress() = BSON.@save trial_file m histepoch histbatch argparams optimizer_α optimizer_w
-
+function save_progress()
+    m_cpu = m |> cpu
+    BSON.@save trial_file m_cpu histepoch histbatch argparams optimizer_α optimizer_w
+end
 struct CbAll
     cbs
 end

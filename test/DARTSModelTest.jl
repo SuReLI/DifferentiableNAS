@@ -44,6 +44,7 @@ end
     @test length(Flux.params(m.cells).order) > 1
     test_image = rand(Float32, 32, 32, 3, 1) |> gpu
     grad = gradient(x->sum(m(x)), test_image)
+    @show m.activations
     @test size(test_image) ==  size(grad[1])
     loss(m, x) = sum(m(x))
     gws = gradient(Flux.params(m.cells)) do

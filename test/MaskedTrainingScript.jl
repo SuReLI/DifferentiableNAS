@@ -20,7 +20,7 @@ include("CIFAR10.jl")
     test_fraction::Float32 = 1.0
 end
 
-argparams = trial_params(trainval_fraction = 0.005, val_split = 0.2, batchsize = 32)
+argparams = trial_params(trainval_fraction = 1.0, val_split = 0.2, batchsize = 32)
 
 m = DARTSModel(num_cells = 5) |> gpu
 
@@ -93,4 +93,5 @@ cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)
 #m = m |> gpu
 #Flux.@epochs 2 DARTStrain1st!(loss, m, train, val, optimizer_α, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)
 
-Flux.@epochs 10 Maskedtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)
+Flux.@epochs 10 Standardtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)
+Flux.@epochs 16 Maskedtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)

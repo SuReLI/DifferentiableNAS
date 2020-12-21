@@ -18,7 +18,7 @@ function get_test_data(get_proportion = 1.0)
         test = test[shuffle(1:length(test))[1:Int64(length(test)*get_proportion)]]
     end
     testimgs = [getarray(test[i].img) for i in 1:length(test)]
-    testY = onehotbatch([test[i].ground_truth.class for i in 1:length(test)], 1:10)
+    testY = Matrix(onehotbatch([test[i].ground_truth.class for i in 1:length(test)], 1:10))
     testX = cat(testimgs..., dims = 4)
     test = (testX,testY)
     return test
@@ -30,7 +30,7 @@ function get_processed_data(splitr = 0.5, batchsize = 64, mini = 1.0)
     total_img = Int(floor(40000*mini))
     X = trainimgs(CIFAR10)
     imgs = [getarray(X[i].img) for i in 1:total_img]
-    labels = onehotbatch([X[i].ground_truth.class for i in 1:total_img],1:10)
+    labels = Matrix(onehotbatch([X[i].ground_truth.class for i in 1:total_img],1:10))
     train_pop = Int(floor((1-splitr)* total_img))
     train = [(cat(imgs[i]..., dims = 4), labels[:,i]) for i in partition(1:train_pop, batchsize)]
     if train_pop < total_img

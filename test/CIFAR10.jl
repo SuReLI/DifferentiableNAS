@@ -25,7 +25,7 @@ function get_test_data(get_proportion = 1.0)
 end
 
 
-function get_processed_data(splitr = 0.5, batchsize = 64, mini = 1.0)
+function get_processed_data(splitr = 0.5, batchsize = 64, mini = 1.0, val_batched = true)
     # Fetching the train and validation data and getting them into proper shape
     total_img = Int(floor(40000*mini))
     X = shuffle(trainimgs(CIFAR10))
@@ -35,10 +35,11 @@ function get_processed_data(splitr = 0.5, batchsize = 64, mini = 1.0)
     train = [(cat(imgs[i]..., dims = 4), labels[:,i]) for i in partition(1:train_pop, batchsize)]
     if train_pop < total_img
         val = [(cat(imgs[i]..., dims = 4), labels[:,i]) for i in partition(train_pop+1:total_img, batchsize)]
+        val_unbatched = (cat(imgs..., dims = 4), labels)
     else
         val = []
     end
-    return train, val
+    return train, val, val_unbatched
 end
 
 export get_processed_data, get_test_data

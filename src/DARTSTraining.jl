@@ -54,10 +54,12 @@ function DARTStrain1st!(loss, model, train, val, opt_α, opt_w; cbepoch = () -> 
 
     for (train_batch, val_batch) in zip(CuIterator(train), CuIterator(val))
         gsα = grad_loss(model, α,  val_batch)
+        foreach(CUDA.unsafe_free!, val_batch)
         Flux.Optimise.update!(opt_α, α, gsα)
         CUDA.reclaim()
 
         gsw = grad_loss(model, w, train_batch)
+        foreach(CUDA.unsafe_free!, train_batch)
         Flux.Optimise.update!(opt_w, w, gsw)
         CUDA.reclaim()
         cbbatch()

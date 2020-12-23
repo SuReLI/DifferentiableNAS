@@ -74,11 +74,6 @@ function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () ->
 
     w = all_ws(model)
 
-    for train_batch in CuIterator(train)
-        gsw = grad_loss(model, w, train_batch)
-        Flux.Optimise.update!(opt, w, gsw)
-        cbbatch()
-    end
     for _ in 1:14
         rn, row, inds, perturbs = perturb([model.normal_αs, model.reduce_αs])
         vals = [accuracy(model, val, pert = pert) for pert in perturbs]
@@ -90,6 +85,13 @@ function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () ->
             display((row, softmax(model.reduce_αs[row])))
         end
     end
+    cbbatch()
+    for train_batch in CuIterator(train)
+        gsw = grad_loss(model, w, train_batch)
+        Flux.Optimise.update!(opt, w, gsw)
+        cbbatch()
+    end
+
     cbepoch()
 end
 

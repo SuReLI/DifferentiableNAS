@@ -20,9 +20,9 @@ include("CIFAR10.jl")
     test_fraction::Float32 = 1.0
 end
 
-argparams = trial_params(trainval_fraction = 1.0, val_split = 0.2, batchsize = 32)
+argparams = trial_params(trainval_fraction = 0.01, val_split = 0.1, batchsize = 32)
 
-m = DARTSModel(num_cells = 5) |> gpu
+#m = DARTSModel(num_cells = 5) |> gpu
 
 num_ops = length(PRIMITIVES)
 
@@ -34,7 +34,7 @@ function loss(m, x, y)
     @show logitcrossentropy(squeeze(m(x)), y)
 end
 
-acccb() = @show(accuracy_batched(m, val |> gpu))
+acccb() = @show(accuracy_batched(m, val))
 function accuracy(m, x, y; pert = [])
     out = mean(onecold(m(x, αs = pert), 1:10) .== onecold(y, 1:10))
 end
@@ -43,7 +43,7 @@ function accuracy_batched(m, xy; pert = [])
     score = 0.0
     count = 0
     for batch in CuIterator(xy)
-        acc = accuracy(m, batch..., pert = pert)
+        @show acc = accuracy(m, batch..., pert = pert)
         score += acc*length(batch)
         count += length(batch)
         CUDA.reclaim()
@@ -63,7 +63,8 @@ end
 optimizer_α = ADAM(3e-4,(0.9,0.999))
 optimizer_w = Nesterov(0.025,0.9) #change?
 
-train, val, val_unbatched = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction)
+val_batchsize = 32
+train, val = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction, val_batchsize)
 test = get_test_data(argparams.test_fraction)
 
 Base.@kwdef mutable struct histories
@@ -73,11 +74,15 @@ Base.@kwdef mutable struct histories
     accuracies::Vector{Float32}
 end
 
-function (hist::histories)()
+function (hist::histories)()#accuracies = false)
     push!(hist.normal_αs, m.normal_αs |> cpu)
     push!(hist.reduce_αs, m.reduce_αs |> cpu)
     push!(hist.activations, m.activations.activations |> cpu)
-    push!(hist.accuracies, accuracy_batched(m, val))
+    #if accuracies
+    #	CUDA.reclaim()
+    #	push!(hist.accuracies, accuracy_batched(m, val))
+    #end
+    CUDA.reclaim()
 end
 histepoch = histories([],[],[],[])
 histbatch = histories([],[],[],[])
@@ -97,9 +102,14 @@ CbAll(cbs...) = CbAll(cbs)
 cbepoch = CbAll(CUDA.reclaim, histepoch, save_progress, CUDA.reclaim)
 cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)
 
-#BSON.@load "test/models/pretrainedmaskprogress2020-12-19T13:59:31.902.bson" m histepoch histbatch
-#m = m |> gpu
-#Flux.@epochs 2 DARTStrain1st!(loss, m, train, val, optimizer_α, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)
+BSON.@load "test/models/masktrain2020-12-21T15:33:42.781.bson" m_cpu histepoch histbatch optimizer_w
+@show typeof(m_cpu.normal_αs)
+#m = gpu(m_cpu)
+pars = Flux.params(cpu(m_cpu))
+m = DARTSModel(num_cells = 5) 
+@show typeof(m.normal_αs)
+Flux.loadparams!(m, pars)
+@show typeof(m.normal_αs)
+m = gpu(m)
 
-Flux.@epochs 10 Standardtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)
 Flux.@epochs 16 Maskedtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)

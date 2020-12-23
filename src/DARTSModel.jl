@@ -316,7 +316,7 @@ function (m::DARTSModel)(x)
     m.classifier(squeeze(out))
 end
 
-function (m::DARTSModel)(x; αs = [[],[]])
+function (m::DARTSModel)(x; αs = [])
     acts = Dict()
     if length(αs) > 0
         normal_αs = αs[1]

@@ -11,16 +11,20 @@ function getarray(X)
     Float32.(permutedims(channelview(X), (2, 3, 1)))
 end
 
-function get_test_data(get_proportion = 1.0)
+function get_test_data(get_proportion = 1.0, batchsize = 0)
     # Fetch the test data from Metalhead and get it into proper shape.
     test = valimgs(CIFAR10)
     if get_proportion < 1.0
         test = test[shuffle(1:length(test))[1:Int64(length(test)*get_proportion)]]
     end
     testimgs = [getarray(test[i].img) for i in 1:length(test)]
-    testY = Matrix(onehotbatch([test[i].ground_truth.class for i in 1:length(test)], 1:10))
-    testX = cat(testimgs..., dims = 4)
-    test = (testX,testY)
+	testY = Matrix(onehotbatch([test[i].ground_truth.class for i in 1:length(test)], 1:10))
+	if batchsize  == 0
+	    testX = cat(testimgs..., dims = 4)
+	    test = (testX,testY)
+	else
+		test = [(cat(testimgs..., dims = 4), testY[:,i]) for i in partition(1:length(test), batchsize)]
+	end
     return test
 end
 

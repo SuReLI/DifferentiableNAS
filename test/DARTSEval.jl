@@ -31,7 +31,7 @@ end
     test_fraction::Float32 = 1.0
 end
 
-argparams = eval_params(trainval_fraction = 0.01)
+argparams = eval_params(trainval_fraction = 0.01, test_fraction = 0.05)
 
 num_ops = length(PRIMITIVES)
 
@@ -42,14 +42,14 @@ throttled_losscb = throttle(losscb, argparams.throttle_)
 function loss(m, x, y)
     #x_g = x |> gpu
     #y_g = y |> gpu
-    logitcrossentropy(squeeze(m(x)), y)
+    @show(logitcrossentropy(squeeze(m(x)), y))
 end
 
-acccb() = @show(accuracy_batched(m, val |> gpu))
+acccb() = @show(accuracy(m, test...))
 function accuracy(m, x, y; pert = [])
     x_g = x |> gpu
     y_g = y |> gpu
-    mean(onecold(m(x_g, normal_αs = pert), 1:10) .== onecold(y_g, 1:10))
+    mean(onecold(m(x_g, αs = pert), 1:10) .== onecold(y_g, 1:10))
 end
 function accuracy_batched(m, xy; pert = [])
     score = 0.0
@@ -88,9 +88,9 @@ trial_file = string("test/models/eval", datesnow, ".bson")
 save_progress() = BSON.@save trial_file m histepoch histbatch argparams
 
 
-trial_name = "test/models/pretrainedmaskprogress2020-12-19T13:59:31.902.bson"
+trial_name = "test/models/alphas09.58.bson"
 
-BSON.@load trial_name m histepoch histbatch
+BSON.@load trial_name normal_ reduce_ argparams histepoch histbatch
 
 
 struct CbAll
@@ -99,12 +99,11 @@ end
 CbAll(cbs...) = CbAll(cbs)
 
 (cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
-cbepoch = CbAll(histepoch, save_progress)
-cbbatch = CbAll(histbatch)
+cbepoch = CbAll(acccb, histepoch, save_progress)
 
-m_eval = DARTSEvalModel(m.normal_αs, m.reduce_αs, num_cells=20, channels=36) |> gpu
+m_eval = DARTSEvalModel(normal_, reduce_, num_cells=20, channels=36) |> gpu
 optimizer = Nesterov(3e-4,0.9)
 batchsize = 32
 train, _ = get_processed_data(0.0, batchsize)
 epochs = 600
-Flux.@epochs 1 DARTSevaltrain1st!(loss, m_eval, train, optimizer; cb = CbAll(losscb))
+Flux.@epochs 1 DARTSevaltrain1st!(loss, m_eval, train, optimizer; cbepoch = cbepoch)

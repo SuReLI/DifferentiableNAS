@@ -140,7 +140,7 @@ end
 
 all_ws(model::DARTSEvalModel) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
 
-function DARTSevaltrain1st!(loss, model, train, opt_w; cb = () -> ())
+function DARTSevaltrain1st!(loss, model, train, opt_w; cbepoch = () -> ())
     function grad_loss(model, ps, batch, verbose = false)
         gs = gradient(ps) do
             loss(model, batch...)
@@ -152,8 +152,6 @@ function DARTSevaltrain1st!(loss, model, train, opt_w; cb = () -> ())
     for train_batch in CuIterator(train)
         gsw = grad_loss(model, w, train_batch)
         Flux.Optimise.update!(opt_w, w, gsw)
-        CUDA.reclaim()
-        cbbatch()
         CUDA.reclaim()
     end
     CUDA.reclaim()

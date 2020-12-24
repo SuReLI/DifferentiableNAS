@@ -387,8 +387,7 @@ function (m::EvalCell)(x1, x2)
     states[1] = state1
     states[2] = state2
     for step in 1:m.steps
-        state = ops[step][1](states[])
-        offset += step + 1
+        state = m.ops[step][1](states[m.inputindices[step][1]]) + m.ops[step][2](states[m.inputindices[step][2]])
         states[step+2] = state
     end
     states_ = copy(states)

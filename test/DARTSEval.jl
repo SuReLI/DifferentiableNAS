@@ -14,7 +14,14 @@ using ColorBrewer
 include("CIFAR10.jl")
 @nograd onehotbatch
 
-
+@with_kw struct trial_params
+    epochs::Int = 50
+    batchsize::Int = 64
+    throttle_::Int = 20
+    val_split::Float32 = 0.5
+    trainval_fraction::Float32 = 1.0
+    test_fraction::Float32 = 1.0
+end
 @with_kw struct eval_params
     epochs::Int = 600
     batchsize::Int = 196
@@ -77,8 +84,14 @@ function (hist::histories)()
 end
 
 datesnow = Dates.now()
-trial_file = string("test/models/pretrainedmaskprogress", datesnow, ".bson")
+trial_file = string("test/models/eval", datesnow, ".bson")
 save_progress() = BSON.@save trial_file m histepoch histbatch argparams
+
+
+trial_name = "test/models/pretrainedmaskprogress2020-12-19T13:59:31.902.bson"
+
+BSON.@load trial_name m histepoch histbatch
+
 
 struct CbAll
     cbs
@@ -86,19 +99,12 @@ end
 CbAll(cbs...) = CbAll(cbs)
 
 (cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
-cbepoch = CbAll(acccb, histepoch, save_progress)
-cbbatch = CbAll(throttled_losscb, histbatch)
+cbepoch = CbAll(histepoch, save_progress)
+cbbatch = CbAll(histbatch)
 
-datesnow = Dates.now()
-file_name = "test/models/pretrainedmaskprogress", datesnow, ".bson"
-save_eval_progress() = BSON.@save file_name m histepoch histbatch
-
-trial_name = "test/models/pretrainedmaskprogress2020-12-19T00:44:54.542.bson"
-BSON.@load trial_name m histepoch histbatch
-
-m_eval = DARTSEvalModel(m, num_cells=20, channels=36) |> gpu
+m_eval = DARTSEvalModel(m.normal_αs, m.reduce_αs, num_cells=20, channels=36) |> gpu
 optimizer = Nesterov(3e-4,0.9)
-batchsize = 96
+batchsize = 32
 train, _ = get_processed_data(0.0, batchsize)
 epochs = 600
 Flux.@epochs 1 DARTSevaltrain1st!(loss, m_eval, train, optimizer; cb = CbAll(losscb))

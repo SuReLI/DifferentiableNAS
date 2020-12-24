@@ -406,9 +406,9 @@ struct DARTSEvalModel
     classifier::Dense
 end
 
-function DARTSEvalModel(searchmodel::DARTSModel; num_cells = 8, channels = 16, num_classes = 10, steps = 4, mult = 4 , stem_mult = 3)
-    α_normal = searchmodel.normal_αs
-    α_reduce = searchmodel.reduce_αs
+function DARTSEvalModel(α_normal::AbstractArray, α_reduce::AbstractArray; num_cells = 8, channels = 16, num_classes = 10, steps = 4, mult = 4 , stem_mult = 3)
+    #α_normal = searchmodel.normal_αs
+    #α_reduce = searchmodel.reduce_αs
     #still ened to discretize alphas so that only top 1 operation from each of top 2 input nodes is going to each outout node
     channels_current = channels*stem_mult
     stem = Chain(

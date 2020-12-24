@@ -1,3 +1,6 @@
+ENV["GKSwstype"]="100"
+
+
 using DifferentiableNAS
 using Flux
 using Flux: throttle, logitcrossentropy, onecold, onehotbatch
@@ -18,7 +21,7 @@ include("CIFAR10.jl")
     test_fraction::Float32 = 1.0
 end
 
-file_name = "test/models/pretrainedmaskprogress2020-12-20T12:31:51.486.bson"
+file_name = "test/models/pretrainedmaskprogress2020-12-19T13:59:31.902.bson"
 BSON.@load file_name histepoch histbatch
 
 connects = vcat([[(j,i) for j = 1:i-1] for i = 3:6]...)
@@ -47,3 +50,9 @@ for i = 1:14
 end
 plot(p..., layout = (2,7), size = (2200,600));
 savefig("test/models/fig_r.png")
+
+
+
+
+
+

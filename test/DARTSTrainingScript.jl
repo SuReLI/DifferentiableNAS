@@ -68,11 +68,16 @@ histepoch = histories([],[],[],[])
 histbatch = histories([],[],[],[])
 
 datesnow = Dates.now()
-trial_file = string("test/models/pretrainedmaskprogress", datesnow, ".bson")
+base_file = string("test/models/darts_", datesnow)
 
 function save_progress()
     m_cpu = m |> cpu
-    BSON.@save trial_file m_cpu histepoch histbatch argparams optimizer_α optimizer_w
+    normal = m_cpu.normal_αs
+    reduce = m_cpu.reduce_αs
+    BSON.@save string(base_file, "model.bson") m_cpu argparams optimizer_α optimizer_w
+    BSON.@save string(base_file, "alphas.bson") normal reduce argparams optimizer_α optimizer_w
+    BSON.@save string(base_file, "histepoch.bson") histepoch
+    BSON.@save string(base_file, "histbatch.bson") histbatch
 end
 
 

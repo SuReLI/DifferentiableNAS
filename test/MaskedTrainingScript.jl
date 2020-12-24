@@ -88,10 +88,13 @@ histepoch = histories([],[],[],[])
 histbatch = histories([],[],[],[])
 
 datesnow = Dates.now()
-trial_file = string("test/models/masktrain", datesnow, ".bson")
+base_file = string("test/models/masked_", datesnow)
+
 function save_progress()
     m_cpu = m |> cpu
-    BSON.@save trial_file m_cpu histepoch histbatch argparams optimizer_α optimizer_w
+    BSON.@save string(base_file, "model.bson") m_cpu argparams optimizer_α optimizer_w
+    BSON.@save string(base_file, "histepoch.bson") histepoch
+    BSON.@save string(base_file, "histbatch.bson") histbatch
 end
 struct CbAll
     cbs
@@ -103,13 +106,9 @@ cbepoch = CbAll(CUDA.reclaim, histepoch, save_progress, CUDA.reclaim)
 cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)
 
 BSON.@load "test/models/masktrain2020-12-21T15:33:42.781.bson" m_cpu histepoch histbatch optimizer_w
-@show typeof(m_cpu.normal_αs)
-#m = gpu(m_cpu)
 pars = Flux.params(cpu(m_cpu))
-m = DARTSModel(num_cells = 5) 
-@show typeof(m.normal_αs)
+m = DARTSModel(num_cells = 5)
 Flux.loadparams!(m, pars)
-@show typeof(m.normal_αs)
 m = gpu(m)
 
 Flux.@epochs 16 Maskedtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)

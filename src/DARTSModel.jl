@@ -368,9 +368,13 @@ function EvalCell(channels_before_last, channels_last, channels, reduce, reduce_
     inputindices = []
     rows = 0
     for i = 3:steps+2 #TODO test this loop, make sure it's not none
-        options = [findmax(αs[rows+j]) for j = 1:i-1]
+        for j = 1:i-1
+            αs[rows+j][1] = -Inf32
+        end
+        options = [findmax(αs[rows+j]) for j = 1:i-1] 
         top2 = partialsortperm(options, 1:2, by = x -> x[1], rev=true)
         top2ops = Tuple(OPS[PRIMITIVES[options[i][2]]](channels, reduce && i < 3 ? 2 : 1, 1) for i in top2)
+        @show [PRIMITIVES[options[i][2]] for i in top2]
         push!(inputindices, top2)
         push!(ops, top2ops)
         rows += i-1
@@ -449,7 +453,8 @@ function (m::DARTSEvalModel)(x)
         s2 = new_state
     end
     out = m.global_pooling(s2)
-    m.classifier(squeeze(out))
+    out = m.classifier(squeeze(out))
+    out
 end
 
 Flux.@functor DARTSEvalModel

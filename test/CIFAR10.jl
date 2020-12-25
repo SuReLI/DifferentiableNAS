@@ -23,7 +23,7 @@ function get_test_data(get_proportion = 1.0, batchsize = 0)
 	    testX = cat(testimgs..., dims = 4)
 	    test = (testX,testY)
 	else
-		test = [(cat(testimgs..., dims = 4), testY[:,i]) for i in partition(1:length(test), batchsize)]
+		test = [(cat(testimgs[i]..., dims = 4), testY[:,i]) for i in partition(1:length(test), batchsize)]
 	end
     return test
 end

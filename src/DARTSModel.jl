@@ -368,9 +368,13 @@ function EvalCell(channels_before_last, channels_last, channels, reduce, reduce_
     inputindices = []
     rows = 0
     for i = 3:steps+2 #TODO test this loop, make sure it's not none
-        options = [findmax(αs[rows+j]) for j = 1:i-1]
+        for j = 1:i-1
+            αs[rows+j][1] = -Inf32
+        end
+        options = [findmax(αs[rows+j]) for j = 1:i-1] 
         top2 = partialsortperm(options, 1:2, by = x -> x[1], rev=true)
         top2ops = Tuple(OPS[PRIMITIVES[options[i][2]]](channels, reduce && i < 3 ? 2 : 1, 1) for i in top2)
+        @show [PRIMITIVES[options[i][2]] for i in top2]
         push!(inputindices, top2)
         push!(ops, top2ops)
         rows += i-1
@@ -387,8 +391,7 @@ function (m::EvalCell)(x1, x2)
     states[1] = state1
     states[2] = state2
     for step in 1:m.steps
-        state = ops[step][1](states[])
-        offset += step + 1
+        state = m.ops[step][1](states[m.inputindices[step][1]]) + m.ops[step][2](states[m.inputindices[step][2]])
         states[step+2] = state
     end
     states_ = copy(states)
@@ -406,9 +409,9 @@ struct DARTSEvalModel
     classifier::Dense
 end
 
-function DARTSEvalModel(searchmodel::DARTSModel; num_cells = 8, channels = 16, num_classes = 10, steps = 4, mult = 4 , stem_mult = 3)
-    α_normal = searchmodel.normal_αs
-    α_reduce = searchmodel.reduce_αs
+function DARTSEvalModel(α_normal::AbstractArray, α_reduce::AbstractArray; num_cells = 8, channels = 16, num_classes = 10, steps = 4, mult = 4 , stem_mult = 3)
+    #α_normal = searchmodel.normal_αs
+    #α_reduce = searchmodel.reduce_αs
     #still ened to discretize alphas so that only top 1 operation from each of top 2 input nodes is going to each outout node
     channels_current = channels*stem_mult
     stem = Chain(
@@ -450,7 +453,8 @@ function (m::DARTSEvalModel)(x)
         s2 = new_state
     end
     out = m.global_pooling(s2)
-    m.classifier(squeeze(out))
+    out = m.classifier(squeeze(out))
+    out
 end
 
 Flux.@functor DARTSEvalModel

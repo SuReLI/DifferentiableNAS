@@ -14,41 +14,51 @@ using ColorBrewer
 include("CIFAR10.jl")
 @nograd onehotbatch
 
-
+@with_kw struct trial_params
+    epochs::Int = 50
+    batchsize::Int = 64
+    throttle_::Int = 20
+    val_split::Float32 = 0.5
+    trainval_fraction::Float32 = 1.0
+    test_fraction::Float32 = 1.0
+end
 @with_kw struct eval_params
     epochs::Int = 600
     batchsize::Int = 196
+    test_batchsize::Int = 196
     throttle_::Int = 20
     val_split::Float32 = 0.0
     trainval_fraction::Float32 = 1.0
     test_fraction::Float32 = 1.0
 end
 
-argparams = eval_params(trainval_fraction = 0.01)
+argparams = eval_params(batchsize = 16, test_batchsize = 16)
 
 num_ops = length(PRIMITIVES)
 
-m = DARTSModel(α_init = (num_ops -> ones(num_ops) |> f32), num_cells = 3, channels = 4) |> gpu
+#m = DARTSModel(α_init = (num_ops -> ones(num_ops) |> f32), num_cells = 3, channels = 4) |> gpu
 
 losscb() = @show(loss(m, test[1] |> gpu, test[2] |> gpu))
 throttled_losscb = throttle(losscb, argparams.throttle_)
 function loss(m, x, y)
     #x_g = x |> gpu
     #y_g = y |> gpu
-    logitcrossentropy(squeeze(m(x)), y)
+    mx = m(x)
+    @show(logitcrossentropy(squeeze(mx), y))
 end
 
-acccb() = @show(accuracy_batched(m, val |> gpu))
-function accuracy(m, x, y; pert = [])
-    x_g = x |> gpu
-    y_g = y |> gpu
-    mean(onecold(m(x_g, normal_αs = pert), 1:10) .== onecold(y_g, 1:10))
+acccb() = @show(accuracy_batched(m_eval, test))
+function accuracy(m, x, y)
+    x_g = x 
+    y_g = y
+    @show(mean(onecold(m(x_g), 1:10) .== onecold(y_g, 1:10)))
 end
-function accuracy_batched(m, xy; pert = [])
+function accuracy_batched(m, xy)
+    @show typeof(xy)
     score = 0.0
     count = 0
-    for batch in xy
-        acc = accuracy(m, batch..., pert = pert)
+    for batch in CuIterator(xy)
+        acc = accuracy(m, batch...)
         println(acc)
         score += acc*length(batch)
         count += length(batch)
@@ -60,7 +70,7 @@ optimizer_α = ADAM(3e-4,(0.9,0.999))
 optimizer_w = Nesterov(0.025,0.9) #change?
 
 train, val = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction)
-test = get_test_data(argparams.test_fraction)
+test = get_test_data(argparams.test_fraction, argparams.batchsize)
 
 Base.@kwdef mutable struct histories
     normal_αs::Vector{Vector{Array{Float32, 1}}}
@@ -70,15 +80,30 @@ Base.@kwdef mutable struct histories
 end
 
 function (hist::histories)()
-    push!(hist.normal_αs, m.normal_αs |> cpu)
-    push!(hist.reduce_αs, m.reduce_αs |> cpu)
-    push!(hist.activations, m.activations |> cpu)
-    push!(hist.accuracies, accuracy_batched(m, val |> gpu))
+    #push!(hist.normal_αs, m.normal_αs |> cpu)
+    #push!(hist.reduce_αs, m.reduce_αs |> cpu)
+    #push!(hist.activations, m.activations |> cpu)
+    push!(hist.accuracies, accuracy_batched(m_eval, val))
 end
+histepoch = histories([],[],[],[])
 
 datesnow = Dates.now()
-trial_file = string("test/models/pretrainedmaskprogress", datesnow, ".bson")
-save_progress() = BSON.@save trial_file m histepoch histbatch argparams
+trial_file = string("test/models/eval", datesnow, ".bson")
+base_file = string("test/models/eval_", datesnow)
+function save_progress()
+    m_cpu = m_eval |> cpu
+    normal = m_cpu.normal_αs
+    reduce = m_cpu.reduce_αs
+    BSON.@save string(base_file, "model.bson") m_cpu argparams optimizer
+    BSON.@save string(base_file, "alphas.bson") normal reduce argparams optimizer
+    BSON.@save string(base_file, "histepoch.bson") histepoch
+end
+
+
+trial_name = "test/models/alphas09.58.bson"
+
+BSON.@load trial_name normal_ reduce_ 
+
 
 struct CbAll
     cbs
@@ -87,18 +112,8 @@ CbAll(cbs...) = CbAll(cbs)
 
 (cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
 cbepoch = CbAll(acccb, histepoch, save_progress)
-cbbatch = CbAll(throttled_losscb, histbatch)
 
-datesnow = Dates.now()
-file_name = "test/models/pretrainedmaskprogress", datesnow, ".bson"
-save_eval_progress() = BSON.@save file_name m histepoch histbatch
-
-trial_name = "test/models/pretrainedmaskprogress2020-12-19T00:44:54.542.bson"
-BSON.@load trial_name m histepoch histbatch
-
-m_eval = DARTSEvalModel(m, num_cells=20, channels=36) |> gpu
+m_eval = DARTSEvalModel(normal_, reduce_, num_cells=20, channels=36) |> gpu
 optimizer = Nesterov(3e-4,0.9)
-batchsize = 96
-train, _ = get_processed_data(0.0, batchsize)
-epochs = 600
-Flux.@epochs 1 DARTSevaltrain1st!(loss, m_eval, train, optimizer; cb = CbAll(losscb))
+Flux.@epochs 10 DARTSevaltrain1st!(loss, m_eval, train, optimizer; cbepoch = cbepoch)
+

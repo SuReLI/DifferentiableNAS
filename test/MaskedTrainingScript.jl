@@ -20,9 +20,7 @@ include("CIFAR10.jl")
     test_fraction::Float32 = 1.0
 end
 
-argparams = trial_params(trainval_fraction = 0.01, val_split = 0.1, batchsize = 32)
-
-#m = DARTSModel(num_cells = 5) |> gpu
+argparams = trial_params(val_split = 0.1)
 
 num_ops = length(PRIMITIVES)
 
@@ -40,6 +38,7 @@ function accuracy(m, x, y; pert = [])
 end
 function accuracy_batched(m, xy; pert = [])
     CUDA.reclaim()
+    GC.gc()
     score = 0.0
     count = 0
     for batch in CuIterator(xy)
@@ -47,16 +46,19 @@ function accuracy_batched(m, xy; pert = [])
         score += acc*length(batch)
         count += length(batch)
         CUDA.reclaim()
+        GC.gc()
     end
     display(score / count)
     score / count
 end
 function accuracy_unbatched(m, xy; pert = [])
     CUDA.reclaim()
+    GC.gc()
     xy = xy | gpu
     acc = accuracy(m, xy..., pert = pert)
     foreach(CUDA.unsafe_free!, xy)
     CUDA.reclaim()
+    GC.gc()
     acc
 end
 
@@ -83,6 +85,7 @@ function (hist::histories)()#accuracies = false)
     #	push!(hist.accuracies, accuracy_batched(m, val))
     #end
     CUDA.reclaim()
+    GC.gc()
 end
 histepoch = histories([],[],[],[])
 histbatch = histories([],[],[],[])
@@ -102,13 +105,14 @@ end
 CbAll(cbs...) = CbAll(cbs)
 
 (cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
-cbepoch = CbAll(CUDA.reclaim, histepoch, save_progress, CUDA.reclaim)
-cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)
+cbepoch = CbAll(CUDA.reclaim, GC.gc, histepoch, save_progress, CUDA.reclaim, GC.gc)
+cbbatch = CbAll(CUDA.reclaim, GC.gc, histbatch, CUDA.reclaim, GC.gc)
 
-BSON.@load "test/models/masktrain2020-12-21T15:33:42.781.bson" m_cpu histepoch histbatch optimizer_w
+BSON.@load "test/models/pretrainedmaskprogress2020-12-21T17:38:09.58.bson" m_cpu histepoch histbatch optimizer_w
 pars = Flux.params(cpu(m_cpu))
-m = DARTSModel(num_cells = 5)
+m = DARTSModel()
 Flux.loadparams!(m, pars)
 m = gpu(m)
+CUDA.memory_status()
 
 Flux.@epochs 16 Maskedtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)

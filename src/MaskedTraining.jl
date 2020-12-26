@@ -59,6 +59,8 @@ function Standardtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () 
 
     for train_batch in CuIterator(train)
         gsw = grad_loss(model, w, train_batch)
+        CUDA.reclaim()
+        GC.gc()
         Flux.Optimise.update!(opt, w, gsw)
         cbbatch()
     end
@@ -88,6 +90,8 @@ function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () ->
     cbbatch()
     for train_batch in CuIterator(train)
         gsw = grad_loss(model, w, train_batch)
+        CUDA.reclaim()
+        GC.gc()
         Flux.Optimise.update!(opt, w, gsw)
         cbbatch()
     end

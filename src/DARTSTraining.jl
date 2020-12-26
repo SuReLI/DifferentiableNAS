@@ -151,10 +151,15 @@ function DARTSevaltrain1st!(loss, model, train, opt_w; cbepoch = () -> ())
 
     for train_batch in CuIterator(train)
         gsw = grad_loss(model, w, train_batch)
+        CUDA.reclaim()
+        GC.gc()
         Flux.Optimise.update!(opt_w, w, gsw)
         CUDA.reclaim()
+        GC.gc()
     end
     CUDA.reclaim()
+    GC.gc()
     cbepoch()
     CUDA.reclaim()
+    GC.gc()
 end

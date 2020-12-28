@@ -1,4 +1,5 @@
-export PRIMITIVES, DARTSModel, Cell, MixedOp, DARTSEvalModel, MaskedDARTSModel, Activations
+export PRIMITIVES, DARTSModel, Cell, MixedOp, DARTSEvalModel, EvalCell,
+Activations
 
 using Flux
 using Base.Iterators
@@ -171,30 +172,12 @@ end
 
 MixedOp(name::String, channels::Int64, stride::Int64) = MixedOp(name, [Op(string(name, "-", prim), OPS[prim](channels, stride, 1) |> gpu) for prim in PRIMITIVES]) |> gpu
 
-function mask(row::Int64, shape::AbstractArray)
-    m = zeros(Float32, size(shape)...)
-    m[row,:] .= 1
-    m
-end
-
-function (m::MixedOp)(x, αs; ms = nothing, acts = Dict())
+function (m::MixedOp)(x, αs; acts = Dict())
     αs = my_softmax(αs)
     sum(αs[i]*m.ops[i](x, acts = acts) for i in 1:length(αs))
 end
 
 Flux.@functor MixedOp
-
-my_zero(xs::AbstractArray) = fill!(similar(xs), zero(eltype(xs)))
-
-collecteachrow(x) = collect(eachrow(x))
-
-@adjoint function collecteachrow(x)
-    collecteachrow(x), dy -> begin
-        dx = my_zero(x) # _zero is not in ZygoteRules, TODO
-        foreach(copyto!, collecteachrow(dx), dy)
-        (dx,)
-    end
-end
 
 struct Cell
     steps::Int64
@@ -290,33 +273,7 @@ function DARTSModel(; α_init = (num_ops -> 2e-3*(rand(num_ops).-0.5) |> f32), n
     DARTSModel(α_normal, α_reduce, stem, cells, global_pooling, classifier, Activations(Dict()))
 end
 
-
-function MaskedDARTSModel(m::DARTSModel; normal_αs = [], reduce_αs = [])
-    if length(normal_αs) == 0
-        normal_αs = m.normal_αs
-    end
-    if length(reduce_αs) == 0
-        reduce_αs = m.reduce_αs
-    end
-    DARTSModel(normal_αs, reduce_αs, m.stem, m.cells, m.global_pooling, m.classifier, Activations(Dict()))
-end
-
-function (m::DARTSModel)(x)
-    acts = Dict()
-    s1 = m.stem(x)
-    s2 = m.stem(x)
-    for (i, cell) in enumerate(m.cells)
-        cell.reduction ? αs = m.reduce_αs : αs = m.normal_αs
-        new_state = cell(s1, s2, αs, acts = acts)
-        s1 = s2
-        s2 = new_state
-    end
-    m.activations.activations = acts
-    out = m.global_pooling(s2)
-    m.classifier(squeeze(out))
-end
-
-function (m::DARTSModel)(x; αs = [])
+function (m::DARTSModel)(x, αs = [])
     acts = Dict()
     if length(αs) > 0
         normal_αs = αs[1]
@@ -371,7 +328,7 @@ function EvalCell(channels_before_last, channels_last, channels, reduce, reduce_
         for j = 1:i-1
             αs[rows+j][1] = -Inf32
         end
-        options = [findmax(αs[rows+j]) for j = 1:i-1] 
+        options = [findmax(αs[rows+j]) for j = 1:i-1]
         top2 = partialsortperm(options, 1:2, by = x -> x[1], rev=true)
         top2ops = Tuple(OPS[PRIMITIVES[options[i][2]]](channels, reduce && i < 3 ? 2 : 1, 1) for i in top2)
         @show [PRIMITIVES[options[i][2]] for i in top2]
@@ -382,7 +339,14 @@ function EvalCell(channels_before_last, channels_last, channels, reduce, reduce_
     EvalCell(steps, reduce, multiplier, prelayer1, prelayer2, ops, inputindices)
 end
 
-function (m::EvalCell)(x1, x2)
+function droppath(x, drop_prob)
+    if drop_prob > 0.0:
+        mask = rand(Bernoulli(1-drop_prod), 1, 1, size(x, 3), 1) |> gpu
+        x = x .* mask / (typeof(data[1])(1-drop_prob))
+    x
+end
+
+function (m::EvalCell)(x1, x2, drop_prob)
     state1 = m.prelayer1(x1)
     state2 = m.prelayer2(x2)
 
@@ -391,8 +355,15 @@ function (m::EvalCell)(x1, x2)
     states[1] = state1
     states[2] = state2
     for step in 1:m.steps
-        state = m.ops[step][1](states[m.inputindices[step][1]]) + m.ops[step][2](states[m.inputindices[step][2]])
-        states[step+2] = state
+        in1 = m.ops[step][1](states[m.inputindices[step][1]])
+        if in1 != states[m.inputindices[step][1]]
+            in1 = droppath(in1, drop_prob)
+        end
+        in2 = m.ops[step][2](states[m.inputindices[step][2]])
+        if in2 != states[m.inputindices[step][2]]
+            in2 = droppath(in2, drop_prob)
+        end
+        states[step+2] = in1 + in2
     end
     states_ = copy(states)
     cat(states_[m.steps+2-m.multiplier+1:m.steps+2]..., dims = 3)
@@ -444,11 +415,11 @@ function DARTSEvalModel(α_normal::AbstractArray, α_reduce::AbstractArray; num_
     DARTSEvalModel(α_normal, α_reduce, stem, cells, global_pooling, classifier)
 end
 
-function (m::DARTSEvalModel)(x)
+function (m::DARTSEvalModel)(x, drop_prob = 0.0)
     s1 = m.stem(x)
     s2 = m.stem(x)
     for (i, cell) in enumerate(m.cells)
-        new_state = cell(s1, s2)
+        new_state = cell(s1, s2, drop_prob)
         s1 = s2
         s2 = new_state
     end

@@ -21,8 +21,11 @@ include("CIFAR10.jl")
     test_fraction::Float32 = 1.0
 end
 
-file_name = "test/models/pretrainedmaskprogress2020-12-19T13:59:31.902.bson"
-BSON.@load file_name histepoch histbatch
+file_name = "test/models/pretrainedmaskprogress2020-12-21T17:38:09.58.bson"
+BSON.@load file_name histbatch argparams
+
+#file_name = "test/models/pretrainedmaskprogress2020-12-19T13:59:31.902.bson"
+#BSON.@load file_name histepoch histbatch
 
 connects = vcat([[(j,i) for j = 1:i-1] for i = 3:6]...)
 
@@ -51,8 +54,6 @@ end
 plot(p..., layout = (2,7), size = (2200,600));
 savefig("test/models/fig_r.png")
 
-
-
-
-
-
+#normal_ = m_cpu.normal_αs
+#reduce_ = m_cpu.reduce_αs
+#BSON.@save "test/models/alphas09.58.bson" normal_ reduce_ histepoch histbatch argparams

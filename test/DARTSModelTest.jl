@@ -58,7 +58,8 @@ end
     k = floor(Int, steps^2/2+3*steps/2)
     num_ops = length(PRIMITIVES)
     data = rand(Float32,8,8,4,2) |> gpu
-    cell = EvalCell(4, 4, 1, false, false, 4, 4) |> gpu
+    αs = [2e-3*(rand(num_ops).-0.5) |> f32 |> gpu  for _ in 1:k]
+    cell = EvalCell(4, 4, 1, false, false, 4, 4, αs) |> gpu
     @test length(Flux.params(cell).order) > 0
     as = [2e-3*(rand(num_ops).-0.5) |> f32 |> gpu  for _ in 1:k]
     @test size(data) == size(cell(data, data, as))

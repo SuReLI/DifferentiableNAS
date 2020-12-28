@@ -44,7 +44,6 @@ function perturb(αs::AbstractArray)
         perturbs[i] = deepcopy(αs)
         perturbs[i][rn][row][inds[i]] = -Inf32
     end
-    display(inds)
     (rn, row, inds, perturbs)
 end
 
@@ -97,11 +96,4 @@ function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () ->
     end
 
     cbepoch()
-end
-
-
-function MaskedEval(model, test, accuracy; cb = () -> ())
-    for batch in test
-        cb()
-    end
 end

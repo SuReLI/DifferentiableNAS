@@ -314,7 +314,7 @@ function maxk(a, k)
     return collect(b)
 end
 
-function discretize(αs, channels, reduce)
+function discretize(αs, channels, reduce, steps)
     ops = []
     opnames = []
     inputindices = []
@@ -327,7 +327,7 @@ function discretize(αs, channels, reduce)
         top2 = partialsortperm(options, 1:2, by = x -> x[1], rev=true)
         top2names = Tuple(PRIMITIVES[options[i][2]] for i in top2)
         top2ops = Tuple(OPS[PRIMITIVES[options[i][2]]](channels, reduce && i < 3 ? 2 : 1, 1) for i in top2)
-        @show [PRIMITIVES[options[i][2]] for i in top2]
+        @show top2
         push!(inputindices, top2)
         push!(opnames, top2names)
         push!(ops, top2ops)
@@ -343,7 +343,7 @@ function EvalCell(channels_before_last, channels_last, channels, reduce, reduce_
         prelayer1 = ReLUConvBN(channels_before_last,channels,(1,1),1,0)
     end
     prelayer2 = ReLUConvBN(channels_last,channels,(1,1),1,0)
-    inputindices, ops, _ = discretize(αs, channels, reduce)
+    inputindices, ops, _ = discretize(αs, channels, reduce, steps)
     EvalCell(steps, reduce, multiplier, prelayer1, prelayer2, ops, inputindices)
 end
 
@@ -351,6 +351,7 @@ function droppath(x, drop_prob)
     if drop_prob > 0.0
         mask = rand(Bernoulli(1-drop_prod), 1, 1, size(x, 3), 1) |> gpu
         x = x .* mask / (typeof(data[1])(1-drop_prob))
+    end
     x
 end
 

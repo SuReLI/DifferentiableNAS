@@ -8,7 +8,7 @@ using Zygote
 using LinearAlgebra
 using CUDA
 using Zygote: @adjoint
-
+using Distributions
 
 ReLUConvBN(channels_in, channels_out, kernel_size, stride, pad) = Chain(
     x -> relu.(x),
@@ -220,7 +220,7 @@ function (m::Cell)(x1, x2, αs; acts = Dict())
         offset += step + 1
         states[step+2] = state
     end
-    states_ = copy(states)
+    states_ = copy(states) 
     cat(states_[m.steps+2-m.multiplier+1:m.steps+2]..., dims = 3)
 end
 
@@ -349,8 +349,8 @@ end
 
 function droppath(x, drop_prob)
     if drop_prob > 0.0
-        mask = rand(Bernoulli(1-drop_prod), 1, 1, size(x, 3), 1) |> gpu
-        x = x .* mask / (typeof(data[1])(1-drop_prob))
+        mask = rand(Bernoulli(1-drop_prob), 1, 1, size(x, 3), 1) |> gpu
+        x = x .* mask / (typeof(x[1])(1-drop_prob))
     end
     x
 end

@@ -49,7 +49,7 @@ end
 
 acccb() = @show(accuracy_batched(m_eval, test))
 function accuracy(m, x, y)
-    x_g = x 
+    x_g = x
     y_g = y
     @show(mean(onecold(m(x_g), 1:10) .== onecold(y_g, 1:10)))
 end
@@ -88,21 +88,21 @@ end
 histepoch = histories([],[],[],[])
 
 datesnow = Dates.now()
-trial_file = string("test/models/eval", datesnow, ".bson")
-base_file = string("test/models/eval_", datesnow)
+base_folder = string("test/models/eval_", datesnow)
+mkpath(base_folder)
 function save_progress()
     m_cpu = m_eval |> cpu
     normal = m_cpu.normal_αs
     reduce = m_cpu.reduce_αs
-    BSON.@save string(base_file, "model.bson") m_cpu argparams optimizer
-    BSON.@save string(base_file, "alphas.bson") normal reduce argparams optimizer
-    BSON.@save string(base_file, "histepoch.bson") histepoch
+    BSON.@save joinpath(base_folder, "model.bson") m_cpu argparams optimizer_α optimizer_w
+    BSON.@save joinpath(base_folder, "alphas.bson") normal reduce argparams optimizer_α optimizer_w
+    BSON.@save joinpath(base_folder, "histepoch.bson") histepoch
+    BSON.@save joinpath(base_folder, "histbatch.bson") histbatch
 end
-
 
 trial_name = "test/models/alphas09.58.bson"
 
-BSON.@load trial_name normal_ reduce_ 
+BSON.@load trial_name normal_ reduce_
 
 
 struct CbAll
@@ -116,4 +116,3 @@ cbepoch = CbAll(acccb, histepoch, save_progress)
 m_eval = DARTSEvalModel(normal_, reduce_, num_cells=20, channels=36) |> gpu
 optimizer = Nesterov(3e-4,0.9)
 Flux.@epochs 10 DARTSevaltrain1st!(loss, m_eval, train, optimizer; cbepoch = cbepoch)
-

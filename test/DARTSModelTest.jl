@@ -62,7 +62,7 @@ end
     cell = EvalCell(4, 4, 1, false, false, 4, 4, αs) |> gpu
     @test length(Flux.params(cell).order) > 0
     as = [2e-3*(rand(num_ops).-0.5) |> f32 |> gpu  for _ in 1:k]
-    @test size(data) == size(cell(data, data, as))
+    @test size(data) == size(cell(data, data, 0.4))
     grad = gradient((x1, x2, αs) -> sum(cell(x1, x2, αs, 0.4)), data, data, as)
     @test size(data) == size(grad[1])
 end

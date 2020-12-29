@@ -13,15 +13,18 @@ function visualize(αs, filename)
     edgelabels = []
     for i in 1:length(inputindices)
         @show add_edge!(g, inputindices[i][1], i+2)
-        @show push!(edgelabels, opnames[i][1])
+        @show push!(edgelabels, (opnames[i][1], inputindices[i][1], i+2))
         @show add_edge!(g, inputindices[i][2], i+2)
-        @show push!(edgelabels, opnames[i][2])
+        @show push!(edgelabels, (opnames[i][2], inputindices[i][2], i+2))
     end
     for i in 3:6
         add_edge!(g, i, 7)
-        push!(edgelabels,  "")
+        push!(edgelabels,  ("", i, 7))
     end
-    gp = gplot(g, locs_x, locs_y, edgelabel=edgelabels, nodelabel=nodelabels, nodefillc=nodefillcs, NODELABELSIZE=3.0)#, edgelabeldisty = -0.5)
+    sort!(edgelabels, by = x -> (x[2],x[3]))
+    edgelabels = [e[1] for e in edgelabels]
+    @show collect(zip(edgelabels, edges(g)))
+    gp = gplot(g, locs_x, locs_y, edgelabel=edgelabels, nodelabel=nodelabels, nodefillc=nodefillcs, NODELABELSIZE=3.0, edgelabeldisty = -0.5)
     draw(PNG(filename), gp)
 end
 

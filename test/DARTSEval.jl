@@ -49,9 +49,8 @@ end
 
 acccb() = @show(accuracy_batched(m_eval, test))
 function accuracy(m, x, y)
-    x_g = x
-    y_g = y
-    @show(mean(onecold(m(x_g), 1:10) .== onecold(y_g, 1:10)))
+    mx = m(x)
+    mean(onecold(mx, 1:10) .== onecold(y, 1:10))
 end
 function accuracy_batched(m, xy)
     @show typeof(xy)
@@ -62,6 +61,8 @@ function accuracy_batched(m, xy)
         println(acc)
         score += acc*length(batch)
         count += length(batch)
+        CUDA.reclaim()
+        GC.gc()
     end
     score / count
 end
@@ -70,7 +71,7 @@ optimizer_α = ADAM(3e-4,(0.9,0.999))
 optimizer_w = Nesterov(0.025,0.9) #change?
 
 train, val = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction)
-test = get_test_data(argparams.test_fraction, argparams.batchsize)
+test = get_test_data(argparams.test_fraction, argparams.test_batchsize)
 
 Base.@kwdef mutable struct histories
     normal_αs::Vector{Vector{Array{Float32, 1}}}
@@ -100,6 +101,7 @@ function save_progress()
     BSON.@save joinpath(base_folder, "histbatch.bson") histbatch
 end
 
+
 trial_name = "test/models/alphas09.58.bson"
 
 BSON.@load trial_name normal_ reduce_
@@ -116,3 +118,4 @@ cbepoch = CbAll(acccb, histepoch, save_progress)
 m_eval = DARTSEvalModel(normal_, reduce_, num_cells=20, channels=36) |> gpu
 optimizer = Nesterov(3e-4,0.9)
 Flux.@epochs 10 DARTSevaltrain1st!(loss, m_eval, train, optimizer; cbepoch = cbepoch)
+

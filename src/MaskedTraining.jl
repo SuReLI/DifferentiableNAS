@@ -67,7 +67,7 @@ function Standardtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () 
     cbepoch()
 end
 
-function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () -> (), cbbatch = () -> ())
+function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = (;kwargs...) -> (), cbbatch = () -> ())
     function grad_loss(model, ps, batch, acts, verbose = false)
         gs = gradient(ps) do
             loss(model, batch..., acts) #also log loss

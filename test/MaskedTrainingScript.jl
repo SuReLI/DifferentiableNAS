@@ -26,10 +26,10 @@ num_ops = length(PRIMITIVES)
 
 losscb() = @show(loss(m, test[1] |> gpu, test[2] |> gpu))
 throttled_losscb = throttle(losscb, argparams.throttle_)
-function loss(m, x, y)
+function loss(m, x, y, acts = nothing)
     #x_g = x |> gpu
     #y_g = y |> gpu
-    @show logitcrossentropy(squeeze(m(x)), y)
+    @show logitcrossentropy(squeeze(m(x, acts = acts)), y)
 end
 
 acccb() = @show(accuracy_batched(m, val))
@@ -79,7 +79,7 @@ end
 function (hist::histories)()#accuracies = false)
     push!(hist.normal_αs, m.normal_αs |> cpu)
     push!(hist.reduce_αs, m.reduce_αs |> cpu)
-    push!(hist.activations, m.activations.activations |> cpu)
+    push!(hist.activations, acts |> cpu)
     #if accuracies
     #	CUDA.reclaim()
     #	push!(hist.accuracies, accuracy_batched(m, val))

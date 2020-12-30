@@ -8,8 +8,9 @@ using CUDA
 using Distributions
 using BSON
 using Dates
+using TensorBoardLogger
+using Logging
 include("CIFAR10.jl")
-@nograd onehotbatch
 
 @with_kw struct trial_params
     epochs::Int = 50
@@ -25,6 +26,8 @@ argparams = trial_params(batchsize = 32)
 num_ops = length(PRIMITIVES)
 
 m = DARTSModel(num_cells = 5) |> gpu
+
+
 
 losscb() = @show(loss(m, test[1] |> gpu, test[2] |> gpu))
 throttled_losscb = throttle(losscb, argparams.throttle_)
@@ -60,9 +63,11 @@ function (hist::histories)()
     push!(hist.normal_αs, m.normal_αs |> cpu)
     push!(hist.reduce_αs, m.reduce_αs |> cpu)
     display("alphas recorded")
-    push!(hist.activations, m.activations.activations |> cpu)
+    push!(hist.activations, acts |> cpu)
     display("activations recorded")
     #push!(hist.accuracies, accuracy_batched(m, val))
+    CUDA.reclaim()
+    GC.gc()
 end
 histepoch = histories([],[],[],[])
 histbatch = histories([],[],[],[])
@@ -80,6 +85,8 @@ function save_progress()
     BSON.@save joinpath(base_folder, "histbatch.bson") histbatch
 end
 
+tbl = TensorBoardLogger.TBLogger(base_folder)
+
 
 struct CbAll
     cbs
@@ -90,4 +97,4 @@ CbAll(cbs...) = CbAll(cbs)
 cbepoch = CbAll(CUDA.reclaim, histepoch, save_progress, CUDA.reclaim)
 cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)
 
-Flux.@epochs 10 DARTStrain1st!(loss, m, train, val, optimizer_α, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)
+Flux.@epochs 10 DARTStrain1st!(loss, m, train, val, optimizer_α, optimizer_w, tbl; cbepoch = cbepoch, cbbatch = cbbatch)

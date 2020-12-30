@@ -367,7 +367,7 @@ function DARTSModel(;
     )
 end
 
-function (m::DARTSModel)(x; acts::Union{Nothing,Dict} = nothing, αs = [])
+function (m::DARTSModel)(x; acts::Union{Nothing,Dict} = nothing, αs::AbstractArray = [])
     if length(αs) > 0
         normal_αs = αs[1]
         reduce_αs = αs[2]

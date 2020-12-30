@@ -9,10 +9,10 @@ using Zygote
 using Zygote: @nograd
 using LinearAlgebra
 using CUDA
+using TensorBoardLogger
+using Logging
 include("utils.jl")
 include("DARTSModel.jl")
-@nograd onehotbatch
-@nograd softmax
 
 function flatten_grads(grads)
     xs = Zygote.Buffer([])
@@ -37,32 +37,47 @@ runall(fs::AbstractVector) = () -> foreach(call, fs)
 all_αs(model::DARTSModel) = Flux.params([model.normal_αs, model.reduce_αs])
 all_ws(model::DARTSModel) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
 
-function DARTStrain1st!(loss, model, train, val, opt_α, opt_w; cbepoch = () -> (), cbbatch = () -> ())
+function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, logger; cbepoch = () -> (), cbbatch = () -> ())
     function grad_loss(model, ps, batch, verbose = false)
         gs = gradient(ps) do
             my_loss = loss(model, batch...)
-            Zygote.@ignore begin
-                #@show my_loss
-            end
-            my_loss
+            return my_loss
         end
     end
 
     w = all_ws(model)
     α = all_αs(model)
-
-
+    acts = Dict()
     for (train_batch, val_batch) in zip(CuIterator(train), CuIterator(val))
-        gsα = grad_loss(model, α,  val_batch)
+        #gsw = grad_loss(model, w, train_batch)
+        gsw = gradient(w) do
+            train_loss = loss(model, train_batch...)
+            return train_loss
+        end
+        foreach(CUDA.unsafe_free!, train_batch)
+        Flux.Optimise.update!(opt_w, w, gsw)
+        CUDA.reclaim()
+
+        #gsα = grad_loss(model, α,  val_batch)
+        gsα = gradient(α) do
+            val_loss = loss(model, val_batch..., acts)
+            return val_loss
+        end
         foreach(CUDA.unsafe_free!, val_batch)
         Flux.Optimise.update!(opt_α, α, gsα)
         CUDA.reclaim()
 
-        gsw = grad_loss(model, w, train_batch)
-        foreach(CUDA.unsafe_free!, train_batch)
-        Flux.Optimise.update!(opt_w, w, gsw)
-        CUDA.reclaim()
+        with_logger(logger) do
+            @info "model" normal=model.normal_αs reduce=model.reduce_αs log_step_increment=0
+            @info "activations" activations=act log_step_increment=0
+            @info "train_batch" loss=train_loss log_step_increment=0
+            @info "val_batch" loss=val_loss
+        end
         cbbatch()
+        acts = Dict()
+    end
+    with_logger(logger) do
+        @info "epoch" marker=0 log_step_increment=0
     end
     cbepoch()
 end

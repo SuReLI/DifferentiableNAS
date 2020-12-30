@@ -39,7 +39,7 @@ function get_processed_data(splitr = 0.5, batchsize = 64, mini = 1.0, val_batchs
     train = [(cat(imgs[i]..., dims = 4), labels[:,i]) for i in partition(1:train_pop, batchsize)]
     if train_pop < total_img
         if val_batchsize == 0
-	    val_batchzise = batchsize
+	    	val_batchsize = batchsize
         end
         val = [(cat(imgs[i]..., dims = 4), labels[:,i]) for i in partition(train_pop+1:total_img, val_batchsize)]
     else

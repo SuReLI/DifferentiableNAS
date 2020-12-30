@@ -68,16 +68,16 @@ histepoch = histories([],[],[],[])
 histbatch = histories([],[],[],[])
 
 datesnow = Dates.now()
-base_file = string("test/models/darts_", datesnow)
-
+base_folder = string("test/models/darts_", datesnow)
+mkpath(base_folder)
 function save_progress()
     m_cpu = m |> cpu
     normal = m_cpu.normal_αs
     reduce = m_cpu.reduce_αs
-    BSON.@save string(base_file, "model.bson") m_cpu argparams optimizer_α optimizer_w
-    BSON.@save string(base_file, "alphas.bson") normal reduce argparams optimizer_α optimizer_w
-    BSON.@save string(base_file, "histepoch.bson") histepoch
-    BSON.@save string(base_file, "histbatch.bson") histbatch
+    BSON.@save joinpath(base_folder, "model.bson") m_cpu argparams optimizer_α optimizer_w
+    BSON.@save joinpath(base_folder, "alphas.bson") normal reduce argparams optimizer_α optimizer_w
+    BSON.@save joinpath(base_folder, "histepoch.bson") histepoch
+    BSON.@save joinpath(base_folder, "histbatch.bson") histbatch
 end
 
 

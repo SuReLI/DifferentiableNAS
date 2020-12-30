@@ -50,7 +50,9 @@ end
         sum(m(test_image))
     end
     @test typeof(gαs[Flux.params(m.normal_αs)[1]]) != Nothing
-    @test length(m.activations.activations) > 0
+    acts = Dict()
+    out = m(test_image, acts = acts)
+    @test length(acts) > 0
 end
 
 @testset "DARTS Eval Cell" begin
@@ -62,8 +64,8 @@ end
     cell = EvalCell(4, 4, 1, false, false, 4, 4, αs) |> gpu
     @test length(Flux.params(cell).order) > 0
     as = [2e-3*(rand(num_ops).-0.5) |> f32 |> gpu  for _ in 1:k]
-    @test size(data) == size(cell(data, data, 0.4))
-    grad = gradient((x1, x2) -> sum(cell(x1, x2, 0.4)), data, data)
+    @test size(data) == size(cell(data, data, Float32(0.4)))
+    grad = gradient((x1, x2) -> sum(cell(x1, x2, Float32(0.4))), data, data)
     @test size(data) == size(grad[1])
 end
 

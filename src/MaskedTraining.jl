@@ -48,16 +48,17 @@ function perturb(αs::AbstractArray)
 end
 
 function Standardtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () -> (), cbbatch = () -> ())
-    function grad_loss(model, ps, batch, verbose = false)
+    function grad_loss(model, ps, batch, acts, verbose = false)
         gs = gradient(ps) do
-            loss(model, batch...)
+            loss(model, batch..., acts)
         end
     end
 
     w = all_ws(model)
-
+    acts = Dict()
     for train_batch in CuIterator(train)
-        gsw = grad_loss(model, w, train_batch)
+        acts = Dict()
+        gsw = grad_loss(model, w, train_batch, acts)
         CUDA.reclaim()
         GC.gc()
         Flux.Optimise.update!(opt, w, gsw)
@@ -67,9 +68,9 @@ function Standardtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () 
 end
 
 function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () -> (), cbbatch = () -> ())
-    function grad_loss(model, ps, batch, verbose = false)
+    function grad_loss(model, ps, batch, acts, verbose = false)
         gs = gradient(ps) do
-            loss(model, batch...)
+            loss(model, batch..., acts) #also log loss
         end
     end
 
@@ -86,12 +87,15 @@ function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () ->
             display((row, softmax(model.reduce_αs[row])))
         end
     end
+    acts = Dict()
     cbbatch()
     for train_batch in CuIterator(train)
+        acts = Dict()
         gsw = grad_loss(model, w, train_batch)
         CUDA.reclaim()
         GC.gc()
         Flux.Optimise.update!(opt, w, gsw)
+        acts = Dict()
         cbbatch()
     end
 

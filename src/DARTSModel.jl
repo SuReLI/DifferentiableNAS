@@ -363,8 +363,7 @@ function DARTSModel(;
         stem,
         cells,
         global_pooling,
-        classifier,
-        Activations(Dict()),
+        classifier
     )
 end
 
@@ -546,7 +545,7 @@ function DARTSEvalModel(
     DARTSEvalModel(α_normal, α_reduce, stem, cells, global_pooling, classifier)
 end
 
-function (m::DARTSEvalModel)(x::AbstractArray, drop_prob::Float32 = 0.0)
+function (m::DARTSEvalModel)(x::AbstractArray, drop_prob::Float32 = Float32(0.0))
     s1 = m.stem(x)
     s2 = m.stem(x)
     for (i, cell) in enumerate(m.cells)

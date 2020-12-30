@@ -81,7 +81,7 @@ end
     test_image = rand(Float32, 32, 32, 3, 1) |> gpu
     grad = gradient(x->sum(m(x)), test_image)
     @test size(test_image) ==  size(grad[1])
-    loss(m, x) = sum(m(x, 0.4))
+    loss(m, x) = sum(m(x, Float32(0.4)))
     gws = gradient(Flux.params(m.cells)) do
         sum(m(test_image))
     end

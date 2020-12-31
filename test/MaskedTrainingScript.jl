@@ -27,8 +27,6 @@ num_ops = length(PRIMITIVES)
 losscb() = @show(loss(m, test[1] |> gpu, test[2] |> gpu))
 throttled_losscb = throttle(losscb, argparams.throttle_)
 function loss(m, x, y, acts = nothing)
-    #x_g = x |> gpu
-    #y_g = y |> gpu
     @show logitcrossentropy(squeeze(m(x, acts = acts)), y)
 end
 

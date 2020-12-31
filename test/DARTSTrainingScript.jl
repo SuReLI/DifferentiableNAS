@@ -8,8 +8,8 @@ using CUDA
 using Distributions
 using BSON
 using Dates
-using TensorBoardLogger
-using Logging
+#using TensorBoardLogger
+#using Logging
 include("CIFAR10.jl")
 
 @with_kw struct trial_params
@@ -27,12 +27,12 @@ num_ops = length(PRIMITIVES)
 
 m = DARTSModel(num_cells = 5) |> gpu
 
-
+acts = Dict()
 
 losscb() = @show(loss(m, test[1] |> gpu, test[2] |> gpu))
 throttled_losscb = throttle(losscb, argparams.throttle_)
-function loss(m, x, y)
-    @show logitcrossentropy(squeeze(m(x)), y)
+function loss(m, x, y, acts = nothing)
+    @show logitcrossentropy(squeeze(m(x, acts = acts)), y)
 end
 
 acccb() = @show(accuracy_batched(m, val))
@@ -55,16 +55,13 @@ end
 optimizer_α = ADAM(3e-4,(0.9,0.999))
 optimizer_w = Nesterov(0.025,0.9) #change?
 
-train, val = gt_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction)
+train, val = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction)
 test = get_test_data(argparams.test_fraction)
 
 function (hist::histories)()
-    display("begin histories")
     push!(hist.normal_αs, m.normal_αs |> cpu)
     push!(hist.reduce_αs, m.reduce_αs |> cpu)
-    display("alphas recorded")
     push!(hist.activations, acts |> cpu)
-    display("activations recorded")
     #push!(hist.accuracies, accuracy_batched(m, val))
     CUDA.reclaim()
     GC.gc()
@@ -85,8 +82,7 @@ function save_progress()
     BSON.@save joinpath(base_folder, "histbatch.bson") histbatch
 end
 
-tbl = TensorBoardLogger.TBLogger(base_folder)
-
+#tbl = TensorBoardLogger.TBLogger(base_folder)
 
 struct CbAll
     cbs
@@ -97,4 +93,4 @@ CbAll(cbs...) = CbAll(cbs)
 cbepoch = CbAll(CUDA.reclaim, histepoch, save_progress, CUDA.reclaim)
 cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)
 
-Flux.@epochs 10 DARTStrain1st!(loss, m, train, val, optimizer_α, optimizer_w, tbl; cbepoch = cbepoch, cbbatch = cbbatch)
+Flux.@epochs 10 DARTStrain1st!(loss, m, train, val, optimizer_α, optimizer_w, acts; cbepoch = cbepoch, cbbatch = cbbatch)

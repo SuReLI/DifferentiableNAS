@@ -37,7 +37,7 @@ runall(fs::AbstractVector) = () -> foreach(call, fs)
 all_αs(model::DARTSModel) = Flux.params([model.normal_αs, model.reduce_αs])
 all_ws(model::DARTSModel) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
 
-function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, logger; cbepoch = () -> (), cbbatch = () -> ())
+function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, acts; cbepoch = () -> (), cbbatch = () -> ())
     function grad_loss(model, ps, batch, verbose = false)
         gs = gradient(ps) do
             my_loss = loss(model, batch...)
@@ -45,6 +45,8 @@ function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, logger; cbepoch 
         end
     end
 
+    local train_loss
+    local val_loss
     w = all_ws(model)
     α = all_αs(model)
     acts = Dict()
@@ -66,13 +68,14 @@ function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, logger; cbepoch 
         foreach(CUDA.unsafe_free!, val_batch)
         Flux.Optimise.update!(opt_α, α, gsα)
         CUDA.reclaim()
-
+        """
         with_logger(logger) do
             @info "model" normal=model.normal_αs reduce=model.reduce_αs log_step_increment=0
-            @info "activations" activations=act log_step_increment=0
+            @info "activations" activations=acts log_step_increment=0
             @info "train_batch" loss=train_loss log_step_increment=0
             @info "val_batch" loss=val_loss
         end
+        """
         cbbatch()
         acts = Dict()
     end

@@ -27,7 +27,7 @@ num_ops = length(PRIMITIVES)
 
 m = DARTSModel(num_cells = 5) |> gpu
 
-acts = Dict()
+local acts
 
 losscb() = @show(loss(m, test[1] |> gpu, test[2] |> gpu))
 throttled_losscb = throttle(losscb, argparams.throttle_)

@@ -87,3 +87,25 @@ end
     end
     @test typeof(gws[Flux.params(m.cells)[1]]) != Nothing
 end
+
+
+@testset "DARTS Eval Aux Model" begin
+    steps = 4
+    k = floor(Int, steps^2/2+3*steps/2)
+    num_ops = length(PRIMITIVES)
+    normal = [2e-3*(rand(num_ops).-0.5) |> f32 |> gpu  for _ in 1:k]
+    reduce = [2e-3*(rand(num_ops).-0.5) |> f32 |> gpu  for _ in 1:k]
+    m = DARTSEvalAuxModel(normal, reduce) |> gpu
+    @test length(Flux.params(m).order) > 1
+    @test length(Flux.params(m.cells).order) > 1
+    test_image = rand(Float32, 32, 32, 3, 1) |> gpu
+    @show out, out_aux = m(test_image, true)
+    @test size(out) == size(out_aux)
+    grad = gradient(x->sum(m(x, true)[1]), test_image)
+    @test size(test_image) ==  size(grad[1])
+    loss(m, x) = sum(m(x, true, Float32(0.4)))
+    gws = gradient(Flux.params(m.cells)) do
+        sum(m(test_image, true))
+    end
+    @test typeof(gws[Flux.params(m.cells)[1]]) != Nothing
+end

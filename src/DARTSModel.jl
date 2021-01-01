@@ -1,5 +1,12 @@
 export PRIMITIVES,
-    DARTSModel, Cell, MixedOp, DARTSEvalModel, EvalCell, Activations, discretize
+    DARTSModel,
+    Cell,
+    MixedOp,
+    DARTSEvalModel,
+    EvalCell,
+    Activations,
+    discretize,
+    DARTSEvalAuxModel
 
 using Flux
 using Base.Iterators
@@ -357,14 +364,7 @@ function DARTSModel(;
     num_ops = length(PRIMITIVES)
     α_normal = [α_init(num_ops) for _ = 1:k]
     α_reduce = [α_init(num_ops) for _ = 1:k]
-    DARTSModel(
-        α_normal,
-        α_reduce,
-        stem,
-        cells,
-        global_pooling,
-        classifier
-    )
+    DARTSModel(α_normal, α_reduce, stem, cells, global_pooling, classifier)
 end
 
 function (m::DARTSModel)(x; acts::Union{Nothing,Dict} = nothing, αs::AbstractArray = [])
@@ -501,9 +501,6 @@ function DARTSEvalModel(
     mult::Int64 = 4,
     stem_mult::Int64 = 3,
 )
-    #α_normal = searchmodel.normal_αs
-    #α_reduce = searchmodel.reduce_αs
-    #still ened to discretize alphas so that only top 1 operation from each of top 2 input nodes is going to each outout node
     channels_current = channels * stem_mult
     stem = Chain(
         Conv((3, 3), 3 => channels_current, pad = (1, 1)),
@@ -559,3 +556,111 @@ function (m::DARTSEvalModel)(x::AbstractArray, drop_prob::Float32 = Float32(0.0)
 end
 
 Flux.@functor DARTSEvalModel
+
+
+struct DARTSEvalAuxModel
+    normal_αs::AbstractArray
+    reduce_αs::AbstractArray
+    stem::Chain
+    cells::AbstractArray
+    auxiliary::Chain
+    global_pooling::AdaptiveMeanPool
+    classifier::Dense
+end
+
+function DARTSEvalAuxModel(
+    α_normal::AbstractArray,
+    α_reduce::AbstractArray;
+    num_cells::Int64 = 8,
+    channels::Int64 = 16,
+    num_classes::Int64 = 10,
+    steps::Int64 = 4,
+    mult::Int64 = 4,
+    stem_mult::Int64 = 3,
+)
+    channels_current = channels * stem_mult
+    stem = Chain(
+        Conv((3, 3), 3 => channels_current, pad = (1, 1)),
+        BatchNorm(channels_current),
+    )
+    channels_before_last = channels_current
+    channels_last = channels_current
+    channels_current = channels
+    channels_aux = channels
+    reduce_previous = false
+    cells = []
+    for i = 1:num_cells
+        if i == num_cells ÷ 3 + 1 || i == 2 * num_cells ÷ 3 + 1
+            channels_current = channels_current * 2
+            reduce = true
+            αs = α_reduce
+        else
+            reduce = false
+            αs = α_normal
+        end
+        cell = EvalCell(
+            channels_before_last,
+            channels_last,
+            channels_current,
+            reduce,
+            reduce_previous,
+            steps,
+            mult,
+            αs,
+        )
+        push!(cells, cell)
+
+        reduce_previous = reduce
+        channels_before_last = channels_last
+        channels_last = mult * channels_current
+        if i == 2 * num_cells ÷ 3 + 1
+            channels_aux = channels_last
+        end
+    end
+    auxiliary = Chain(
+        x -> relu.(x), #inplace?
+        MeanPool((5, 5), pad = 0, stride = 3),
+        Conv((1, 1), channels_aux => 128),
+        BatchNorm(128),
+        x -> relu.(x),
+        Conv((2, 2), 128 => 768),
+        BatchNorm(768),
+        x -> relu.(x),
+        x -> dropdims(reshape(x, size(x, 3), :), dims = 2),
+        Dense(768, num_classes),
+    )
+    global_pooling = AdaptiveMeanPool((1, 1))
+    classifier = Dense(channels_last, num_classes)
+    DARTSEvalAuxModel(
+        α_normal,
+        α_reduce,
+        stem,
+        cells,
+        auxiliary,
+        global_pooling,
+        classifier,
+    )
+end
+
+function (m::DARTSEvalAuxModel)(
+    x::AbstractArray,
+    is_training::Bool = false,
+    drop_prob::Float32 = Float32(0.0),
+)
+    s1 = m.stem(x)
+    s2 = m.stem(x)
+    out_aux = similar(s2, 10)
+    for (i, cell) in enumerate(m.cells)
+        new_state = cell(s1, s2, drop_prob)
+        s1 = s2
+        s2 = new_state
+        if i == 2 * length(m.cells) ÷ 3 + 1 && is_training
+            out_aux = m.auxiliary(s2)
+        end
+    end
+    out = m.global_pooling(s2)
+    out = m.classifier(squeeze(out))
+    out, out_aux
+end
+
+Flux.@functor DARTSEvalAuxModel

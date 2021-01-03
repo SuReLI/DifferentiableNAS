@@ -1,9 +1,7 @@
 using DifferentiableNAS
 using Flux
 using CUDA
-using SliceMap
-using Zygote: @showgrad
-using Zygote
+using Distributions: Bernoulli
 include("CIFAR10.jl")
 
 @testset "DARTS MixedOp" begin
@@ -34,6 +32,12 @@ end
 end
 
 @testset "DARTS Model" begin
+    steps = 4
+    k = floor(Int, steps^2/2+3*steps/2)
+    num_ops = length(PRIMITIVES)
+    data = rand(Float32,8,8,4,2) |> gpu
+    masked_αs = [2e-3*(rand(num_ops).-0.5).*rand(Bernoulli(),num_ops) |> f32 |> gpu  for _ in 1:k]
+    @show(typeof(masked_αs))
     m = DARTSModel() |> gpu
     @test length(Flux.params(m).order) > 1
     @test length(all_αs(m).order) + length(all_ws(m).order) == length(Flux.params(m).order)
@@ -50,9 +54,12 @@ end
         sum(m(test_image))
     end
     @test typeof(gαs[Flux.params(m.normal_αs)[1]]) != Nothing
-    acts = Dict()
-    out = m(test_image, acts = acts)
-    @test length(acts) > 0
+    @test length(m.activations.currentacts) > 0
+    key = collect(keys(m.activations.currentacts))[1]
+    @show sample1 = m.activations.currentacts[key]
+    out = m(test_image, αs=[masked_αs, masked_αs])
+    @show sample2 = m.activations.currentacts[key]
+    @test sample1 != sample2
 end
 
 @testset "DARTS Eval Cell" begin
@@ -99,13 +106,13 @@ end
     @test length(Flux.params(m).order) > 1
     @test length(Flux.params(m.cells).order) > 1
     test_image = rand(Float32, 32, 32, 3, 1) |> gpu
-    @show out, out_aux = m(test_image, true)
+    out, out_aux = m(test_image, true)
     @test size(out) == size(out_aux)
     grad = gradient(x->sum(m(x, true)[1]), test_image)
     @test size(test_image) ==  size(grad[1])
     loss(m, x) = sum(m(x, true, Float32(0.4)))
     gws = gradient(Flux.params(m.cells)) do
-        sum(m(test_image, true))
+        sum(sum(m(test_image, true)))
     end
     @test typeof(gws[Flux.params(m.cells)[1]]) != Nothing
 end

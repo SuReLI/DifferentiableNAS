@@ -232,7 +232,7 @@ MixedOp(name::String, channels::Int64, stride::Int64) =
 function (m::MixedOp)(
     x::AbstractArray,
     αs::AbstractArray,
-    acts::Union{Nothing,Dict} = nothing,
+    acts::Dict = nothing,
 )
     αs = my_softmax(αs)
     sum(αs[i] * m.ops[i](x, acts) for i = 1:length(αs))
@@ -306,6 +306,10 @@ end
 
 Flux.@functor Cell
 
+mutable struct Activations
+    currentacts::Dict{String, Array{Float32,1}}
+end
+
 struct DARTSModel
     normal_αs::AbstractArray
     reduce_αs::AbstractArray
@@ -313,6 +317,7 @@ struct DARTSModel
     cells::AbstractArray
     global_pooling::AdaptiveMeanPool
     classifier::Dense
+    activations::Activations
 end
 
 function DARTSModel(;
@@ -364,10 +369,11 @@ function DARTSModel(;
     num_ops = length(PRIMITIVES)
     α_normal = [α_init(num_ops) for _ = 1:k]
     α_reduce = [α_init(num_ops) for _ = 1:k]
-    DARTSModel(α_normal, α_reduce, stem, cells, global_pooling, classifier)
+    activations = Activations(Dict{String, Array{Float32,1}}())
+    DARTSModel(α_normal, α_reduce, stem, cells, global_pooling, classifier, activations)
 end
 
-function (m::DARTSModel)(x; acts::Union{Nothing,Dict} = nothing, αs::AbstractArray = [])
+function (m::DARTSModel)(x; αs::AbstractArray = [])
     if length(αs) > 0
         normal_αs = αs[1]
         reduce_αs = αs[2]
@@ -379,7 +385,7 @@ function (m::DARTSModel)(x; acts::Union{Nothing,Dict} = nothing, αs::AbstractAr
     s2 = m.stem(x)
     for (i, cell) in enumerate(m.cells)
         cell.reduction ? αs = reduce_αs : αs = normal_αs
-        new_state = cell(s1, s2, αs, acts)
+        new_state = cell(s1, s2, αs, m.activations.currentacts)
         s1 = s2
         s2 = new_state
     end

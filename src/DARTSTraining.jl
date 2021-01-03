@@ -9,7 +9,7 @@ using Zygote
 using Zygote: @nograd
 using LinearAlgebra
 using CUDA
-using TensorBoardLogger
+#using TensorBoardLogger
 using Logging
 include("utils.jl")
 include("DARTSModel.jl")
@@ -59,11 +59,16 @@ function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, acts; cbepoch = 
         foreach(CUDA.unsafe_free!, train_batch)
         Flux.Optimise.update!(opt_w, w, gsw)
         CUDA.reclaim()
-
+        if length(acts) > 0
+            @show acts["5-6-dil_conv_5x5"]
+        end
         #gsα = grad_loss(model, α,  val_batch)
         gsα = gradient(α) do
             val_loss = loss(model, val_batch..., acts)
             return val_loss
+        end
+        if length(acts) > 0
+            @show acts["5-6-dil_conv_5x5"]
         end
         foreach(CUDA.unsafe_free!, val_batch)
         Flux.Optimise.update!(opt_α, α, gsα)

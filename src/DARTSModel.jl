@@ -232,7 +232,7 @@ MixedOp(name::String, channels::Int64, stride::Int64) =
 function (m::MixedOp)(
     x::AbstractArray,
     αs::AbstractArray,
-    acts::Dict = nothing,
+    acts::Union{Nothing,Dict} = nothing,
 )
     αs = my_softmax(αs)
     sum(αs[i] * m.ops[i](x, acts) for i = 1:length(αs))

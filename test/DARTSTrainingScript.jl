@@ -31,8 +31,8 @@ local acts
 
 losscb() = @show(loss(m, test[1] |> gpu, test[2] |> gpu))
 throttled_losscb = throttle(losscb, argparams.throttle_)
-function loss(m, x, y, acts = nothing)
-    @show logitcrossentropy(squeeze(m(x, acts = acts)), y)
+function loss(m, x, y)
+    @show logitcrossentropy(squeeze(m(x)), y)
 end
 
 acccb() = @show(accuracy_batched(m, val))

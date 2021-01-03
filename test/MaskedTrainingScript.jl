@@ -77,7 +77,7 @@ end
 function (hist::histories)()#accuracies = false)
     push!(hist.normal_αs, m.normal_αs |> cpu)
     push!(hist.reduce_αs, m.reduce_αs |> cpu)
-    push!(hist.activations, acts |> cpu)
+    push!(hist.activations, m.activations.currentacts |> cpu)
     #if accuracies
     #	CUDA.reclaim()
     #	push!(hist.accuracies, accuracy_batched(m, val))

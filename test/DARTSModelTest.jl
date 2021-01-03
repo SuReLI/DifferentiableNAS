@@ -56,9 +56,9 @@ end
     @test typeof(gαs[Flux.params(m.normal_αs)[1]]) != Nothing
     @test length(m.activations.currentacts) > 0
     key = collect(keys(m.activations.currentacts))[1]
-    @show sample1 = m.activations.currentacts[key]
+    sample1 = m.activations.currentacts[key]
     out = m(test_image, αs=[masked_αs, masked_αs])
-    @show sample2 = m.activations.currentacts[key]
+    sample2 = m.activations.currentacts[key]
     @test sample1 != sample2
 end
 

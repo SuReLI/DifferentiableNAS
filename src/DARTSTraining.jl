@@ -37,21 +37,12 @@ runall(fs::AbstractVector) = () -> foreach(call, fs)
 all_αs(model::DARTSModel) = Flux.params([model.normal_αs, model.reduce_αs])
 all_ws(model::DARTSModel) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
 
-function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, acts; cbepoch = () -> (), cbbatch = () -> ())
-    function grad_loss(model, ps, batch, verbose = false)
-        gs = gradient(ps) do
-            my_loss = loss(model, batch...)
-            return my_loss
-        end
-    end
-
+function DARTStrain1st!(loss, model, train, val, opt_α, opt_w; cbepoch = () -> (), cbbatch = () -> ())
     local train_loss
     local val_loss
     w = all_ws(model)
     α = all_αs(model)
-    acts = Dict()
     for (train_batch, val_batch) in zip(CuIterator(train), CuIterator(val))
-        #gsw = grad_loss(model, w, train_batch)
         gsw = gradient(w) do
             train_loss = loss(model, train_batch...)
             return train_loss
@@ -59,33 +50,20 @@ function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, acts; cbepoch = 
         foreach(CUDA.unsafe_free!, train_batch)
         Flux.Optimise.update!(opt_w, w, gsw)
         CUDA.reclaim()
-        if length(acts) > 0
-            @show acts["5-6-dil_conv_5x5"]
+        if length(model.activations.currentacts) > 0
+            @show model.activations.currentacts["5-6-dil_conv_5x5"]
         end
-        #gsα = grad_loss(model, α,  val_batch)
         gsα = gradient(α) do
-            val_loss = loss(model, val_batch..., acts)
+            val_loss = loss(model, val_batch...)
             return val_loss
         end
-        if length(acts) > 0
-            @show acts["5-6-dil_conv_5x5"]
+        if length(model.activations.currentacts) > 0
+            @show model.activations.currentacts["5-6-dil_conv_5x5"]
         end
         foreach(CUDA.unsafe_free!, val_batch)
         Flux.Optimise.update!(opt_α, α, gsα)
         CUDA.reclaim()
-        """
-        with_logger(logger) do
-            @info "model" normal=model.normal_αs reduce=model.reduce_αs log_step_increment=0
-            @info "activations" activations=acts log_step_increment=0
-            @info "train_batch" loss=train_loss log_step_increment=0
-            @info "val_batch" loss=val_loss
-        end
-        """
         cbbatch()
-        acts = Dict()
-    end
-    with_logger(logger) do
-        @info "epoch" marker=0 log_step_increment=0
     end
     cbepoch()
 end

@@ -21,7 +21,7 @@ include("CIFAR10.jl")
     test_fraction::Float32 = 1.0
 end
 
-folder_name = "test/models/osirim/darts_2021-01-01T19:45:13.899"
+folder_name = "test/models/osirim/darts_2021-01-03T21:05:12.494"
 BSON.@load joinpath(folder_name,"histbatch.bson") histbatch
 BSON.@load joinpath(folder_name,"histepoch.bson") histepoch
 
@@ -30,7 +30,7 @@ for (k,v) in histbatch.activations[1]
     datadict[k] = Matrix{Float32}(undef, length(histbatch.activations), length(v))
 end
 for (i, batch) in enumerate(histbatch.activations)
-    @show (i, batch)
+    @show batch["2-5-dil_conv_5x5"]
     for (k,v) in batch
         datadict[k][i,:] .= v
     end

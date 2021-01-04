@@ -655,7 +655,6 @@ function (m::DARTSEvalAuxModel)(
 )
     s1 = m.stem(x)
     s2 = m.stem(x)
-    out_aux = similar(s2, 10)
     for (i, cell) in enumerate(m.cells)
         new_state = cell(s1, s2, drop_prob)
         s1 = s2
@@ -666,6 +665,9 @@ function (m::DARTSEvalAuxModel)(
     end
     out = m.global_pooling(s2)
     out = m.classifier(squeeze(out))
+    if !is_training
+        out_aux = out
+    end
     out, out_aux
 end
 

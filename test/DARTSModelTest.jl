@@ -37,7 +37,6 @@ end
     num_ops = length(PRIMITIVES)
     data = rand(Float32,8,8,4,2) |> gpu
     masked_αs = [2e-3*(rand(num_ops).-0.5).*rand(Bernoulli(),num_ops) |> f32 |> gpu  for _ in 1:k]
-    @show(typeof(masked_αs))
     m = DARTSModel() |> gpu
     @test length(Flux.params(m).order) > 1
     @test length(all_αs(m).order) + length(all_ws(m).order) == length(Flux.params(m).order)

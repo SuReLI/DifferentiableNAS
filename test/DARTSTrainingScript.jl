@@ -25,9 +25,7 @@ argparams = trial_params(batchsize = 32)
 
 num_ops = length(PRIMITIVES)
 
-m = DARTSModel(num_cells = 5) |> gpu
-
-local acts
+m = DARTSModel() |> gpu
 
 losscb() = @show(loss(m, test[1] |> gpu, test[2] |> gpu))
 throttled_losscb = throttle(losscb, argparams.throttle_)
@@ -59,9 +57,9 @@ train, val = get_processed_data(argparams.val_split, argparams.batchsize, argpar
 test = get_test_data(argparams.test_fraction)
 
 function (hist::histories)()
-    push!(hist.normal_αs, m.normal_αs |> cpu)
-    push!(hist.reduce_αs, m.reduce_αs |> cpu)
-    push!(hist.activations, m.activations.currentacts |> cpu)
+    push!(hist.normal_αs, copy(m.normal_αs) |> cpu)
+    push!(hist.reduce_αs, copy(m.reduce_αs) |> cpu)
+    push!(hist.activations, copy(m.activations.currentacts) |> cpu)
     #push!(hist.accuracies, accuracy_batched(m, val))
     CUDA.reclaim()
     GC.gc()
@@ -93,4 +91,4 @@ CbAll(cbs...) = CbAll(cbs)
 cbepoch = CbAll(CUDA.reclaim, histepoch, save_progress, CUDA.reclaim)
 cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)
 
-Flux.@epochs 10 DARTStrain1st!(loss, m, train, val, optimizer_α, optimizer_w, acts; cbepoch = cbepoch, cbbatch = cbbatch)
+Flux.@epochs 10 DARTStrain1st!(loss, m, train, val, optimizer_α, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)

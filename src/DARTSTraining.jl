@@ -50,15 +50,9 @@ function DARTStrain1st!(loss, model, train, val, opt_α, opt_w; cbepoch = () -> 
         foreach(CUDA.unsafe_free!, train_batch)
         Flux.Optimise.update!(opt_w, w, gsw)
         CUDA.reclaim()
-        if length(model.activations.currentacts) > 0
-            @show model.activations.currentacts["5-6-dil_conv_5x5"]
-        end
         gsα = gradient(α) do
             val_loss = loss(model, val_batch...)
             return val_loss
-        end
-        if length(model.activations.currentacts) > 0
-            @show model.activations.currentacts["5-6-dil_conv_5x5"]
         end
         foreach(CUDA.unsafe_free!, val_batch)
         Flux.Optimise.update!(opt_α, α, gsα)

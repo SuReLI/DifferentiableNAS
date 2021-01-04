@@ -189,22 +189,24 @@ struct Op
     op::Any
 end
 
-function showlayer(x::AbstractArray, layer, opname::String, outs::Array{Float32})
+function showlayer(x::AbstractArray, layer, opname::String, outs::Array{Array{Float32,3}})
     out = layer(x)
     Zygote.ignore() do
         if !(typeof(layer) <: Flux.BatchNorm) && !occursin("none", opname)
-            outs = vcat(outs, dropdims(mean(out, dims=(1,2)), dims = 1))
+            push!(outs, dropdims(mean(out, dims=(1,2)), dims = 1))
         end
     end
     out
 end
 
 function (opwrap::Op)(xin::AbstractArray, acts::Dict)
-    outs = Array{Float32}(undef, 0, size(xin,3), size(xin,4))
+    outs = Array{Array{Float32,3}}(undef,0)
     xout =
         foldl((x, layer) -> showlayer(x, layer, opwrap.name, outs), opwrap.op, init = xin)
     Zygote.ignore() do
-        acts[opwrap.name] = outs
+        if length(outs) > 0
+            acts[opwrap.name] = vcat(outs...)
+        end
     end
     xout
 end

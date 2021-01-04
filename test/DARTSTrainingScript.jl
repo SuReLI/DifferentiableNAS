@@ -25,7 +25,7 @@ argparams = trial_params(batchsize = 32)
 
 num_ops = length(PRIMITIVES)
 
-m = DARTSModel() |> gpu
+m = DARTSModel(num_cells = 4, channels = 4) |> gpu
 
 losscb() = @show(loss(m, test[1] |> gpu, test[2] |> gpu))
 throttled_losscb = throttle(losscb, argparams.throttle_)

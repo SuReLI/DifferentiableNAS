@@ -193,19 +193,23 @@ function showlayer(x::AbstractArray, layer, opname::String, outs::Array{Array{Fl
     out = layer(x)
     Zygote.ignore() do
         if !(typeof(layer) <: Flux.BatchNorm) && !occursin("none", opname)
-            push!(outs, dropdims(mean(out, dims=(1,2)), dims = 1))
+            push!(outs, dropdims(mean(out, dims=(1,2,3)),dims=3) |> cpu)
         end
     end
     out
 end
 
-function (opwrap::Op)(xin::AbstractArray, acts::Dict)
+function (opwrap::Op)(xin::AbstractArray, acts::Dict, cellid::Int64)
     outs = Array{Array{Float32,3}}(undef,0)
     xout =
         foldl((x, layer) -> showlayer(x, layer, opwrap.name, outs), opwrap.op, init = xin)
     Zygote.ignore() do
         if length(outs) > 0
-            acts[opwrap.name] = vcat(outs...)
+            if haskey(acts, opwrap.name)
+                acts[opwrap.name] = vcat(acts[opwrap.name],hcat(outs...))
+            else
+                acts[opwrap.name] = hcat(outs...)
+            end
         end
     end
     xout
@@ -218,12 +222,14 @@ end
 Flux.@functor Op
 
 struct MixedOp
+    cellid::Int64
     name::String
     ops::AbstractArray
 end
 
-MixedOp(name::String, channels::Int64, stride::Int64) =
+MixedOp(cellid::Int64, name::String, channels::Int64, stride::Int64) =
     MixedOp(
+        cellid,
         name,
         [
             Op(string(name, "-", prim), OPS[prim](channels, stride, 1) |> gpu)
@@ -237,7 +243,7 @@ function (m::MixedOp)(
     acts::Union{Nothing,Dict} = nothing,
 )
     αs = my_softmax(αs)
-    sum(αs[i] * m.ops[i](x, acts) for i = 1:length(αs))
+    sum(αs[i] * m.ops[i](x, acts, m.cellid) for i = 1:length(αs))
 end
 
 Flux.@functor MixedOp
@@ -259,6 +265,7 @@ function Cell(
     reduce_previous::Bool,
     steps::Int64,
     multiplier::Int64,
+    cellid::Int64
 )
     if reduce_previous
         prelayer1 = FactorizedReduce(channels_before_last, channels, 2) |> gpu
@@ -270,7 +277,7 @@ function Cell(
     for i = 3:steps+2 #op output
         for j = 1:i-1 #op input
             reduce && j < 3 ? stride = 2 : stride = 1
-            mixedop = MixedOp(string(j, "-", i), channels, stride) |> gpu
+            mixedop = MixedOp(cellid, string(j, "-", i), channels, stride) |> gpu
             push!(mixedops, mixedop)
         end
     end
@@ -358,6 +365,7 @@ function DARTSModel(;
                 reduce_previous,
                 steps,
                 mult,
+                i
             ) |> gpu
         push!(cells, cell)
 
@@ -371,7 +379,7 @@ function DARTSModel(;
     num_ops = length(PRIMITIVES)
     α_normal = [α_init(num_ops) for _ = 1:k]
     α_reduce = [α_init(num_ops) for _ = 1:k]
-    activations = Activations(Dict{String, Array{Float32,1}}())
+    activations = Activations(Dict{String, Array{Float32,3}}())
     DARTSModel(α_normal, α_reduce, stem, cells, global_pooling, classifier, activations)
 end
 
@@ -385,6 +393,7 @@ function (m::DARTSModel)(x; αs::AbstractArray = [])
     end
     s1 = m.stem(x)
     s2 = m.stem(x)
+    m.activations.currentacts = Dict{String, Array{Float32,3}}()
     for (i, cell) in enumerate(m.cells)
         cell.reduction ? αs = reduce_αs : αs = normal_αs
         new_state = cell(s1, s2, αs, m.activations.currentacts)

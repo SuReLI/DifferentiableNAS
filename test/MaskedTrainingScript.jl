@@ -75,9 +75,9 @@ Base.@kwdef mutable struct histories
 end
 
 function (hist::histories)()#accuracies = false)
-    push!(hist.normal_αs, m.normal_αs |> cpu)
-    push!(hist.reduce_αs, m.reduce_αs |> cpu)
-    push!(hist.activations, m.activations.currentacts |> cpu)
+    push!(hist.normal_αs, copy(m.normal_αs) |> cpu)
+    push!(hist.reduce_αs, copy(m.reduce_αs) |> cpu)
+    push!(hist.activations, copy(m.activations.currentacts) |> cpu)
     #if accuracies
     #	CUDA.reclaim()
     #	push!(hist.accuracies, accuracy_batched(m, val))
@@ -110,11 +110,12 @@ CbAll(cbs...) = CbAll(cbs)
 cbepoch = CbAll(CUDA.reclaim, GC.gc, histepoch, save_progress, CUDA.reclaim, GC.gc)
 cbbatch = CbAll(CUDA.reclaim, GC.gc, histbatch, CUDA.reclaim, GC.gc)
 
-BSON.@load "test/models/pretrainedmaskprogress2020-12-21T17:38:09.58.bson" m_cpu histepoch histbatch optimizer_w
-pars = Flux.params(cpu(m_cpu))
+#BSON.@load "test/models/pretrainedmaskprogress2020-12-21T17:38:09.58.bson" m_cpu histepoch histbatch optimizer_w
+#pars = Flux.params(cpu(m_cpu))
+#m_cpu = nothing
 m = DARTSModel()
-Flux.loadparams!(m, pars)
+#Flux.loadparams!(m, pars)
 m = gpu(m)
 CUDA.memory_status()
-
-Flux.@epochs 16 Maskedtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)
+Flux.@epochs 10 Standardtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)
+Flux.@epochs 10 Maskedtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)

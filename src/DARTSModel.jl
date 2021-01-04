@@ -193,14 +193,14 @@ function showlayer(x::AbstractArray, layer, opname::String, outs::Array{Float32}
     out = layer(x)
     Zygote.ignore() do
         if !(typeof(layer) <: Flux.BatchNorm) && !occursin("none", opname)
-            push!(outs, mean(out |> cpu))
+            outs = vcat(outs, dropdims(mean(out, dims=(1,2)), dims = 1))
         end
     end
     out
 end
 
 function (opwrap::Op)(xin::AbstractArray, acts::Dict)
-    outs = Array{Float32}(undef, 0)
+    outs = Array{Float32}(undef, 0, size(xin,3), size(xin,4))
     xout =
         foldl((x, layer) -> showlayer(x, layer, opwrap.name, outs), opwrap.op, init = xin)
     Zygote.ignore() do
@@ -307,7 +307,7 @@ end
 Flux.@functor Cell
 
 mutable struct Activations
-    currentacts::Dict{String, Array{Float32,1}}
+    currentacts::Dict{String, Array{Float32,3}}
 end
 
 struct DARTSModel

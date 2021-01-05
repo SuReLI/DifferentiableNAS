@@ -12,10 +12,10 @@ function visualize(αs, filename)
     nodefillcs = ["lightgreen", "lightgreen", "lightblue", "lightblue", "lightblue", "lightblue", "lightyellow"]
     edgelabels = []
     for i in 1:length(inputindices)
-        @show add_edge!(g, inputindices[i][1], i+2)
-        @show push!(edgelabels, (opnames[i][1], inputindices[i][1], i+2))
-        @show add_edge!(g, inputindices[i][2], i+2)
-        @show push!(edgelabels, (opnames[i][2], inputindices[i][2], i+2))
+        add_edge!(g, inputindices[i][1], i+2)
+        push!(edgelabels, (opnames[i][1], inputindices[i][1], i+2))
+        add_edge!(g, inputindices[i][2], i+2)
+        push!(edgelabels, (opnames[i][2], inputindices[i][2], i+2))
     end
     for i in 3:6
         add_edge!(g, i, 7)

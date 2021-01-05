@@ -10,7 +10,6 @@ using Zygote: @nograd
 using LinearAlgebra
 using CUDA
 #using TensorBoardLogger
-using Logging
 include("utils.jl")
 include("DARTSModel.jl")
 

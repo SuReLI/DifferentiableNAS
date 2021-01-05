@@ -8,8 +8,10 @@ using CUDA
 using Distributions
 using BSON
 using Dates
+using Plots
+#using TensorBoardLogger
+#using Logging
 include("CIFAR10.jl")
-@nograd onehotbatch
 
 @with_kw struct trial_params
     epochs::Int = 50
@@ -20,9 +22,11 @@ include("CIFAR10.jl")
     test_fraction::Float32 = 1.0
 end
 
-argparams = trial_params(val_split = 0.1)
+argparams = trial_params()
 
 num_ops = length(PRIMITIVES)
+
+m = DARTSModel(num_cells = 4, channels = 4) |> gpu
 
 losscb() = @show(loss(m, test[1] |> gpu, test[2] |> gpu))
 throttled_losscb = throttle(losscb, argparams.throttle_)
@@ -32,56 +36,32 @@ end
 
 acccb() = @show(accuracy_batched(m, val))
 function accuracy(m, x, y; pert = [])
-    out = mean(onecold(m(x, αs = pert), 1:10) .== onecold(y, 1:10))
+    mean(onecold(m(x, normal_αs = pert), 1:10) .== onecold(y, 1:10))
 end
 function accuracy_batched(m, xy; pert = [])
     CUDA.reclaim()
-    GC.gc()
     score = 0.0
     count = 0
     for batch in CuIterator(xy)
-        @show acc = accuracy(m, batch..., pert = pert)
+        acc = accuracy(m, batch..., pert = pert)
         score += acc*length(batch)
         count += length(batch)
         CUDA.reclaim()
-        GC.gc()
     end
-    display(score / count)
-    score / count
-end
-function accuracy_unbatched(m, xy; pert = [])
-    CUDA.reclaim()
-    GC.gc()
-    xy = xy | gpu
-    acc = accuracy(m, xy..., pert = pert)
-    foreach(CUDA.unsafe_free!, xy)
-    CUDA.reclaim()
-    GC.gc()
-    acc
+    @show score / count
 end
 
 optimizer_α = ADAM(3e-4,(0.9,0.999))
 optimizer_w = Nesterov(0.025,0.9) #change?
 
-val_batchsize = 32
-train, val = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction, val_batchsize)
+train, val = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction)
 test = get_test_data(argparams.test_fraction)
 
-Base.@kwdef mutable struct histories
-    normal_αs::Vector{Vector{Array{Float32, 1}}}
-    reduce_αs::Vector{Vector{Array{Float32, 1}}}
-    activations::Vector{Dict}
-    accuracies::Vector{Float32}
-end
-
-function (hist::histories)()#accuracies = false)
+function (hist::histories)()
     push!(hist.normal_αs, copy(m.normal_αs) |> cpu)
     push!(hist.reduce_αs, copy(m.reduce_αs) |> cpu)
     push!(hist.activations, copy(m.activations.currentacts) |> cpu)
-    #if accuracies
-    #	CUDA.reclaim()
-    #	push!(hist.accuracies, accuracy_batched(m, val))
-    #end
+    #push!(hist.accuracies, accuracy_batched(m, val))
     CUDA.reclaim()
     GC.gc()
 end
@@ -89,7 +69,7 @@ histepoch = histories([],[],[],[])
 histbatch = histories([],[],[],[])
 
 datesnow = Dates.now()
-base_folder = string("test/models/masked_", datesnow)
+base_folder = string("test/models/darts_", datesnow)
 mkpath(base_folder)
 function save_progress()
     m_cpu = m |> cpu
@@ -101,21 +81,15 @@ function save_progress()
     BSON.@save joinpath(base_folder, "histbatch.bson") histbatch
 end
 
+#tbl = TensorBoardLogger.TBLogger(base_folder)
+
 struct CbAll
     cbs
 end
 CbAll(cbs...) = CbAll(cbs)
 
 (cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
-cbepoch = CbAll(CUDA.reclaim, GC.gc, histepoch, save_progress, CUDA.reclaim, GC.gc)
-cbbatch = CbAll(CUDA.reclaim, GC.gc, histbatch, CUDA.reclaim, GC.gc)
+cbepoch = CbAll(CUDA.reclaim, histepoch, save_progress, CUDA.reclaim)
+cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)
 
-#BSON.@load "test/models/pretrainedmaskprogress2020-12-21T17:38:09.58.bson" m_cpu histepoch histbatch optimizer_w
-#pars = Flux.params(cpu(m_cpu))
-#m_cpu = nothing
-m = DARTSModel()
-#Flux.loadparams!(m, pars)
-m = gpu(m)
-CUDA.memory_status()
-Flux.@epochs 10 Standardtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)
-Flux.@epochs 10 Maskedtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)
+Flux.@epochs 10 Activationtrain1st!(loss, m, train, val, optimizer_α, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)

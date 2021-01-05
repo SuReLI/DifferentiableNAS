@@ -210,7 +210,7 @@ function (opwrap::Op)(xin::AbstractArray, acts::Dict, cellid::Int64)
             else
                 acts[opwrap.name] = hcat(outs...)
             end
-        end
+        end #acts dims: cellid x oplayer x image
     end
     xout
 end

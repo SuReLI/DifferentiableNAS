@@ -9,7 +9,9 @@ using LinearAlgebra
 
 include("DARTSModel.jl")
 include("DARTSTraining.jl")
+include("ActivationTraining.jl")
 include("MaskedTraining.jl")
 include("utils.jl")
+#include("visualize.jl")
 
 end # module

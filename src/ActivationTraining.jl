@@ -9,6 +9,7 @@ using Zygote
 using Zygote: @nograd
 using LinearAlgebra
 using CUDA
+using Plots
 include("utils.jl")
 include("DARTSModel.jl")
 
@@ -128,7 +129,8 @@ function Activationtrain1st!(loss, model, train, val, opt_α, opt_w; cbepoch = (
     local gsα
     w = all_ws(model)
     α = all_αs(model)
-    fake = all_αs(model).*0
+    fakeg = all_αs(model).*0
+    fakea = all_αs(model).*0
     global i
     for (train_batch, val_batch) in zip(CuIterator(train), CuIterator(val))
         gsw = gradient(w) do
@@ -144,11 +146,18 @@ function Activationtrain1st!(loss, model, train, val, opt_α, opt_w; cbepoch = (
             return val_loss
         end
         foreach(CUDA.unsafe_free!, val_batch)
+        CUDA.reclaim()
+        GC.gc()
         gs = [gsα[x] for x in α]
-        for (f,g) in zip(fake, gs)
-            Flux.Optimise.update!(opt_α, f, g)
+        for (f,g) in zip(fakeg, gs)
+            f .-= g
         end
-        @show norm(fake), norm(α)
+        CUDA.reclaim()
+        GC.gc()
+        ac1 = activationupdatesd(model)
+        for (f,a) in zip(fakea, ac1)
+            f .+= a
+        end
         CUDA.reclaim()
         cbbatch()
     end
@@ -160,15 +169,14 @@ function Activationtrain1st!(loss, model, train, val, opt_α, opt_w; cbepoch = (
     end
     foreach(CUDA.unsafe_free!, val_batch)
     """
-    ac1 = activationupdatesd(model)
-    p1 = heatmap(axlab, PRIMITIVES, hcat((ac1 |> cpu)...), xrotation = 90, title = "Activation Standard Deviation")
-    ac2 = activationupdatema(model)
-    p2 = heatmap(axlab, PRIMITIVES, hcat((ac2 |> cpu)...), xrotation = 90, title = "Activation Mean of Absolute Value")
+    #ac1 = activationupdatesd(model)
+    p1 = heatmap(axlab, PRIMITIVES, hcat((fakea |> cpu)...), xrotation = 90, title = "Activation Standard Deviation")
+    #ac2 = activationupdatema(model)
+    #p2 = heatmap(axlab, PRIMITIVES, hcat((ac2 |> cpu)...), xrotation = 90, title = "Activation Mean of Absolute Value")
     #gs = [gsα[x] for x in α]
-    p3 = heatmap(axlab, PRIMITIVES, hcat((fake |> cpu)...), xrotation = 90 , title = "Alpha Gradient Update")
-    plot(p1,p2,p3,layout = (3,1),size = (1300, 1500))
-    @show string(i, "fig_gsvsacts.png")
-    savefig(string(i, "fig_gsvsacts.png"));
+    p3 = heatmap(axlab, PRIMITIVES, hcat((fakeg |> cpu)...), xrotation = 90 , title = "Alpha Gradient Update")
+    plot(p1,p3,layout = (2,1),size = (1200, 800))
+    savefig(string("test/models/fig_gsvsacts", i, ".png"));
     i += 1
     cbepoch()
 end

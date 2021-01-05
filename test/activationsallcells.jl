@@ -4,14 +4,13 @@ ENV["GKSwstype"]="100"
 using DifferentiableNAS
 using Flux
 using Flux: throttle, logitcrossentropy, onecold, onehotbatch
-using StatsBase: mean, median
+using StatsBase
 using Parameters
 using CUDA
 using Distributions
 using BSON
 using Plots
 using Plots.PlotMeasures
-
 include("CIFAR10.jl")
 
 @with_kw struct trial_params
@@ -29,34 +28,36 @@ color = cgrad(g) |> C
 
 
 #acts dims: cellid x oplayer x image
-folder_name = "test/models/darts_2021-01-04T22:58:38.87"
+folder_name = "test/models/osirim/darts_2021-01-04T22:44:32.328"
 BSON.@load joinpath(folder_name,"histbatch.bson") histbatch
 BSON.@load joinpath(folder_name,"histepoch.bson") histepoch
 
 datadict = Dict{String, Array{Float32,4}}()
-datadictepoch = Dict{String, Array{Float32,3}}()
+datadictepoch = Dict{String, Array{Float32,4}}()
 
-images = sum([size(d["3-6-sep_conv_3x3"],3) for d in histbatch.activations])
+epochs = length(histepoch.activations)
+images = sum([size(d["3-6-sep_conv_3x3"],3) for d in histbatch.activations]) ÷ epochs
 
 for (k,v) in histbatch.activations[1]
     datadict[k] = Array{Float32,4}(undef, length(histbatch.activations), size(v)...)
-    datadictepoch[k] = Array{Float32,3}(undef, size(v,1), size(v,2), images)
+    datadictepoch[k] = Array{Float32,4}(undef, length(histepoch.activations), size(v,1), size(v,2), images)
 end
 
+e = 1
+ep = 1
 for (i, batch) in enumerate(histbatch.activations)
-    e = 1
     for (k,v) in batch
         a = 1
         while a < 32
             datadict[k][i,:,:,a:size(v,3)+a-1] .= v #batch x cellid x oplayer x image
             a += size(v,3)
         end
-        datadictepoch[k][:,:,e:size(v,3)+e-1] .= v #image x cellid x oplayer
-        @show size(v)
-        @show e += size(v,3)
-        if e > images
-            e = 1
-        end
+        datadictepoch[k][ep,:,:,e:size(v,3)+e-1] .= v #epoch x cellid x oplayer x image
+    end
+    e += size(batch["3-6-sep_conv_3x3"],3)
+    if e > images
+        e = 1
+        @show ep += 1
     end
 end
 
@@ -74,6 +75,7 @@ connects = vcat([[(j,i) for j = 1:i-1] for i = 3:6]...)
 a_conn = [collect(zip(connects, a)) for a in histbatch.normal_αs]
 sortin = sort(connects)
 sorta = [[s[2] for s in sort(a)] for a in a_conn]
+
 for (j, op) in enumerate(PRIMITIVES[2:length(PRIMITIVES)])
     layers = size(datadict[string("2-3-", op)],3)
     p = Vector(undef, layers+1)
@@ -84,13 +86,32 @@ for (j, op) in enumerate(PRIMITIVES[2:length(PRIMITIVES)])
     for i = 1:layers
         p[i+1] = plot(title = string(op, " ",layerdict[op][i]))
         for (n1, n2) in sortin
-            cellop = string(n1,"-",n2,"-",op)
-            plot!(dropdims(median(datadict[cellop][:,:,i,:], dims = (2,3)), dims=(2,3)), label=string(n1,"->",n2), legend = :outerright, left_margin = 10mm)
+            #cellop = string(n1,"-",n2,"-",op)
+            #plot!(datadictepoch[cellop][1,:,i,:], label=string(n1,"->",n2), legend = :outerright, left_margin = 10mm)
+            hdata = dropdims(mean(datadictepoch["4-6-dil_conv_3x3"][:,:,2,:], dims = 2), dims = 2)
+            bins = minimum(hdata):0.01:maximum(hdata)
+            h = hcat([fit(Histogram, hdata[i,:], bins).weights for i in 1:epochs]...)
+            ticks = [(bins[i]+bins[i+1])/2 for i in 1:length(bins)-1]
+            heatmap(1:epochs, ticks, h, xlabel="epoch", ylabel="spatial+channel+cell meaned activation", title="4-6-dil_conv_3x3, 3x3conv layer")
         end
     end
     plot(p..., layout = (layers+1,1), size = (1200, 400*(layers+1)))
-    savefig(joinpath(folder_name,string("fig_allcells_med_", op, ".png")));
+    savefig(joinpath(folder_name,string("fig_", op, ".png")));
 end
+
+
+#heatmap(datadictepoch["3-6-dil_conv_3x3"][:,4,2,:]', xlabel="epoch", ylabel="image", title="3-6-dil_conv_3x3, cell 3, dilconv layer")
+hdata = dropdims(mean(datadictepoch["4-6-sep_conv_3x3"][:,:,2,:], dims = 2), dims = 2)
+bins = minimum(hdata):0.001:maximum(hdata)
+h = hcat([fit(Histogram, hdata[i,:], bins).weights for i in 1:epochs]...)
+ticks = [(bins[i]+bins[i+1])/2 for i in 1:length(bins)-1]
+heatmap(1:epochs, ticks, h, xlabel="epoch", ylabel="spatial+channel+cell meaned activation", title="4-6-dil_conv_3x3, dilconv layer")
+
+hdata = datadict["4-6-sep_conv_3x3"][:,4,5,:]
+bins = minimum(hdata):0.01:maximum(hdata)
+h = hcat([fit(Histogram, hdata[i,:], bins).weights for i in 1:size(datadict["4-6-sep_conv_3x3"][:,4,2,:],1)]...)
+ticks = [(bins[i]+bins[i+1])/2 for i in 1:length(bins)-1]
+heatmap(1:size(datadict["4-6-sep_conv_3x3"][:,4,2,:],1), ticks, h, xlabel="batch", ylabel="spatial+channel meaned activation", title="4-6-sep_conv_3x3, sepconv layer")
 
 
 

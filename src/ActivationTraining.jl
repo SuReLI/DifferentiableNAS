@@ -1,4 +1,4 @@
-export Activationtrain1st!, activationupdate
+export Activationtrain1st!, activationupdate, collectweights
 
 using Flux
 using Flux: onehotbatch
@@ -18,9 +18,9 @@ function collectweights(model)
         #cell.reduction
         for (j,mixedop) in enumerate(cell.mixedops)
             for (k,op) in enumerate(mixedop.ops)
-                for l in op.op
-                    if typeof(l) <: Flux.Conv
-                        #@show typeof(l.weight)
+                for (l,layer) in enumerate(op.op)
+                    if typeof(layer) <: Flux.Conv
+                        @show (i,j,k,l,norm(layer.weight),size(layer.weight))
                     end
                 end
                 #@show [typeof(p) for p in Flux.params(op.op).params]

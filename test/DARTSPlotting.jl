@@ -21,8 +21,8 @@ include("CIFAR10.jl")
     test_fraction::Float32 = 1.0
 end
 
-file_name = "test/models/pretrainedmaskprogress2020-12-21T17:38:09.58.bson"
-BSON.@load file_name histbatch argparams
+file_name = "test/models/osirim/masked_2021-01-05T18:40:26.49/histbatch.bson"
+BSON.@load file_name histbatch #argparams
 
 #file_name = "test/models/pretrainedmaskprogress2020-12-19T13:59:31.902.bson"
 #BSON.@load file_name histepoch histbatch
@@ -52,7 +52,7 @@ for i = 1:14
     end
 end
 plot(p..., layout = (2,7), size = (2200,600));
-savefig("test/models/fig_r.png")
+savefig("test/models/osirim/masked_2021-01-05T18:40:26.49/fig_r.png")
 
 #normal_ = m_cpu.normal_αs
 #reduce_ = m_cpu.reduce_αs

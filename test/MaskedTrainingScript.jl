@@ -68,15 +68,15 @@ train, val = get_processed_data(argparams.val_split, argparams.batchsize, argpar
 test = get_test_data(argparams.test_fraction)
 
 Base.@kwdef mutable struct histories
-    normal_αs::Vector{Vector{Array{Float32, 1}}}
-    reduce_αs::Vector{Vector{Array{Float32, 1}}}
+    normal_αs_sm::Vector{Vector{Array{Float32, 1}}}
+    reduce_αs_sm::Vector{Vector{Array{Float32, 1}}}
     activations::Vector{Dict}
     accuracies::Vector{Float32}
 end
 
 function (hist::histories)()#accuracies = false)
-    push!(hist.normal_αs, copy(m.normal_αs) |> cpu)
-    push!(hist.reduce_αs, copy(m.reduce_αs) |> cpu)
+    push!(hist.normal_αs_sm, softmax.(copy(m.normal_αs)) |> cpu)
+    push!(hist.reduce_αs_sm, softmax.(copy(m.reduce_αs)) |> cpu)
     push!(hist.activations, copy(m.activations.currentacts) |> cpu)
     #if accuracies
     #	CUDA.reclaim()

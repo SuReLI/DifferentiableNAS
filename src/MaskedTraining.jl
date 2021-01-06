@@ -49,7 +49,6 @@ function perturb(αs::AbstractArray)
                 perturbs[i] = deepcopy(αs)
                 perturbs[i][rn][row][inds[i]] = -Inf32
             end
-            @show (rn, row, inds)
             return (rn, row, inds, perturbs)
         end
     end
@@ -83,17 +82,18 @@ function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () ->
 
     w = all_ws(model)
 
-    for _ in 1:14
+    for _ in 1:1 #14
         rn, row, inds, perturbs = perturb([model.normal_αs, model.reduce_αs])
         if rn == -1
             continue
         end
         vals = [accuracy(model, val, pert = pert) for pert in perturbs]
+        to_remove = sortperm(vals)[1:length(vals)-1]
         if rn == 1
-            model.normal_αs[row][findmax(vals)[2]] = -Inf32
+            model.normal_αs[row][to_remove] .= -Inf32
             display((row, softmax(model.normal_αs[row])))
         else
-            model.reduce_αs[row][findmax(vals)[2]] = -Inf32
+            model.reduce_αs[row][to_remove] .= -Inf32
             display((row, softmax(model.reduce_αs[row])))
         end
     end

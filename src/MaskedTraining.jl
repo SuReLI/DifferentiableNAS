@@ -36,15 +36,24 @@ runall(fs::AbstractVector) = () -> foreach(call, fs)
 all_ws(model::DARTSModel) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
 
 function perturb(αs::AbstractArray)
-    rn = rand(1:2)
-    row = rand(1:length(αs[rn]))
-    inds = findall(softmax(αs[rn][row]) .> 0)
-    perturbs = [copy(αs) for i in inds]
-    for i in 1:length(inds)
-        perturbs[i] = deepcopy(αs)
-        perturbs[i][rn][row][inds[i]] = -Inf32
+    counter = [ones(length(a)) for a in αs]
+    while sum(sum(counter)) > 0
+        rn = rand([i for i in 1:length(counter) if sum(counter[i]) > 0])
+        row = rand([i for i in 1:length(counter[rn]) if counter[rn][i] == 1])
+        inds = findall(softmax(αs[rn][row]) .> 0)
+        if length(inds) <= 1
+            counter[rn][row] = 0
+        else
+            perturbs = [copy(αs) for i in inds]
+            for i in 1:length(inds)
+                perturbs[i] = deepcopy(αs)
+                perturbs[i][rn][row][inds[i]] = -Inf32
+            end
+            @show (rn, row, inds)
+            return (rn, row, inds, perturbs)
+        end
     end
-    (rn, row, inds, perturbs)
+    return (-1, -1, [], [])
 end
 
 function Standardtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () -> (), cbbatch = () -> ())
@@ -76,6 +85,9 @@ function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () ->
 
     for _ in 1:14
         rn, row, inds, perturbs = perturb([model.normal_αs, model.reduce_αs])
+        if rn == -1
+            continue
+        end
         vals = [accuracy(model, val, pert = pert) for pert in perturbs]
         if rn == 1
             model.normal_αs[row][findmax(vals)[2]] = -Inf32

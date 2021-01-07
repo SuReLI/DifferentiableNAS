@@ -1,4 +1,4 @@
-export Activationtrain1st!, activationupdate, collectweights
+export Activationtrain1st!, activationupdate, collectweights, activationpre
 
 using Flux
 using Flux: onehotbatch
@@ -123,7 +123,22 @@ all_ws(model::DARTSModel) = Flux.params([model.stem, model.cells..., model.globa
 
 i = 1
 
-function Activationtrain1st!(loss, model, train, val, opt_α, opt_w; cbepoch = () -> (), cbbatch = () -> ())
+function activationpre(model, val)
+    acts = []
+    for val_batch in CuIterator(val)
+        val_loss = loss(model, val_batch...)
+        foreach(CUDA.unsafe_free!, val_batch)
+        CUDA.reclaim()
+        GC.gc()
+        ac1 = activationupdatesd(model)
+        push(acts, ac1)
+        CUDA.reclaim()
+        cbbatch()
+    end
+    acts
+end
+
+function Activationtrain1st!(loss, model, train, val, opt_α, opt_w, baseacts; cbepoch = () -> (), cbbatch = () -> ())
     local train_loss
     local val_loss
     local gsα
@@ -132,7 +147,7 @@ function Activationtrain1st!(loss, model, train, val, opt_α, opt_w; cbepoch = (
     fakeg = all_αs(model).*0
     fakea = all_αs(model).*0
     global i
-    for (train_batch, val_batch) in zip(CuIterator(train), CuIterator(val))
+    for (train_batch, val_batch, base_act) in zip(CuIterator(train), CuIterator(val), acts)
         gsw = gradient(w) do
             train_loss = loss(model, train_batch...)
             return train_loss
@@ -154,8 +169,9 @@ function Activationtrain1st!(loss, model, train, val, opt_α, opt_w; cbepoch = (
         end
         CUDA.reclaim()
         GC.gc()
-        ac1 = activationupdatesd(model)
-        for (f,a) in zip(fakea, ac1)
+        curracts = activationupdatesd(model)
+        actupdate = [log.(curr./base) for (curr, base) in zip(curracts, baseacts)]
+        for (f,a) in zip(fakea, actupdate)
             f .+= a
         end
         CUDA.reclaim()
@@ -177,6 +193,7 @@ function Activationtrain1st!(loss, model, train, val, opt_α, opt_w; cbepoch = (
     p3 = heatmap(axlab, PRIMITIVES, hcat((fakeg |> cpu)...), xrotation = 90 , title = "Alpha Gradient Update")
     plot(p1,p3,layout = (2,1),size = (1200, 800))
     savefig(string("test/models/fig_gsvsacts", i, ".png"));
+
     i += 1
     cbepoch()
 end

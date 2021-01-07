@@ -92,4 +92,5 @@ CbAll(cbs...) = CbAll(cbs)
 cbepoch = CbAll(CUDA.reclaim, histepoch, save_progress, CUDA.reclaim)
 cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)
 
+acts = activationpre(m, val)
 Flux.@epochs 10 Activationtrain1st!(loss, m, train, val, optimizer_α, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)

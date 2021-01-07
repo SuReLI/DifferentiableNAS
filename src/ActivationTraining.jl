@@ -123,7 +123,7 @@ all_ws(model::DARTSModel) = Flux.params([model.stem, model.cells..., model.globa
 
 i = 1
 
-function activationpre(model, val)
+function activationpre(loss, model, val)
     acts = []
     for val_batch in CuIterator(val)
         val_loss = loss(model, val_batch...)

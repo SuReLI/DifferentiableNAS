@@ -406,7 +406,6 @@ end
 
 Flux.@functor DARTSModel
 
-
 struct EvalCell
     steps::Int64
     reduction::Bool

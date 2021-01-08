@@ -1,6 +1,7 @@
 using DifferentiableNAS
 using Flux
 using Flux: throttle, logitcrossentropy, onecold, onehotbatch
+using Zygote: @nograd
 using StatsBase: mean
 using Parameters
 using CUDA
@@ -15,9 +16,16 @@ include("CIFAR10.jl")
     batchsize::Int = 64
     throttle_::Int = 20
     val_split::Float32 = 0.5
+    trainval_fraction::Float32 = 1.0
     test_fraction::Float32 = 1.0
 end
 
+argparams = trial_params(val_split = 0.1, batchsize=32)
+
+num_ops = length(PRIMITIVES)
+
+losscb() = @show(loss(m, test[1] |> gpu, test[2] |> gpu))
+throttled_losscb = throttle(losscb, argparams.throttle_)
 function loss(m, x, y)
     @show logitcrossentropy(squeeze(m(x)), y)
 end
@@ -51,41 +59,38 @@ function accuracy_unbatched(m, xy; pert = [])
     GC.gc()
     acc
 end
-Base.@kwdef mutable struct histories
-    normal_αs::Vector{Vector{Array{Float32, 1}}}
-    reduce_αs::Vector{Vector{Array{Float32, 1}}}
-    activations::Vector{Dict}
-    accuracies::Vector{Float32}
-end
 
-function (hist::histories)()
-    push!(hist.normal_αs_sm, copy(m.normal_αs) |> cpu)
-    push!(hist.reduce_αs_sm, copy(m.reduce_αs) |> cpu)
-    push!(hist.activations, m.activations |> cpu)
-    #push!(hist.accuracies, accuracy_batched(m, val |> gpu))
-end
+optimizer_α = ADAM(3e-4,(0.9,0.999))
+optimizer_w = Nesterov(0.025,0.9) #change?
 
+val_batchsize = 32
+train, val = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction, val_batchsize)
+test = get_test_data(argparams.test_fraction)
 
 Base.@kwdef mutable struct historiessm
     normal_αs_sm::Vector{Vector{Array{Float32, 1}}}
     reduce_αs_sm::Vector{Vector{Array{Float32, 1}}}
     activations::Vector{Dict}
+    accuracies::Vector{Float32}
 end
 
-function (hist::historiessm)()
+function (hist::historiessm)()#accuracies = false)
     push!(hist.normal_αs_sm, softmax.(copy(m.normal_αs)) |> cpu)
     push!(hist.reduce_αs_sm, softmax.(copy(m.reduce_αs)) |> cpu)
     push!(hist.activations, copy(m.activations.currentacts) |> cpu)
+    #if accuracies
+    #	CUDA.reclaim()
+    #	push!(hist.accuracies, accuracy_batched(m, val))
+    #end
     CUDA.reclaim()
     GC.gc()
 end
-struct CbAll
-    cbs
-end
-CbAll(cbs...) = CbAll(cbs)
+histepoch = historiessm([],[],[],[])
+histbatch = historiessm([],[],[],[])
 
-(cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
-
+datesnow = Dates.now()
+base_folder = string("test/models/masked_", datesnow)
+mkpath(base_folder)
 function save_progress()
     m_cpu = m |> cpu
     normal = m_cpu.normal_αs
@@ -95,3 +100,19 @@ function save_progress()
     BSON.@save joinpath(base_folder, "histepoch.bson") histepoch
     BSON.@save joinpath(base_folder, "histbatch.bson") histbatch
 end
+
+struct CbAll
+    cbs
+end
+CbAll(cbs...) = CbAll(cbs)
+
+(cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
+cbepoch = CbAll(CUDA.reclaim, GC.gc, histepoch, save_progress, CUDA.reclaim, GC.gc)
+cbbatch = CbAll(CUDA.reclaim, GC.gc, histbatch, CUDA.reclaim, GC.gc)
+
+
+m = DARTSModel(num_cells = 4, channels = 4)
+m = gpu(m)
+zs = 0*vcat(m.normal_αs, m.reduce_αs)
+us = 0*vcat(m.normal_αs, m.reduce_αs)
+Flux.@epochs 10 ADMMtrain1st!(loss, m, train, val, optimizer_w, optimizer_α, zs, us, 1e-3; cbepoch = cbepoch, cbbatch = cbbatch)

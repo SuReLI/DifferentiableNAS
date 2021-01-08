@@ -67,14 +67,14 @@ val_batchsize = 32
 train, val = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction, val_batchsize)
 test = get_test_data(argparams.test_fraction)
 
-Base.@kwdef mutable struct histories
+Base.@kwdef mutable struct historiessm
     normal_αs_sm::Vector{Vector{Array{Float32, 1}}}
     reduce_αs_sm::Vector{Vector{Array{Float32, 1}}}
     activations::Vector{Dict}
     accuracies::Vector{Float32}
 end
 
-function (hist::histories)()#accuracies = false)
+function (hist::historiessm)()#accuracies = false)
     push!(hist.normal_αs_sm, softmax.(copy(m.normal_αs)) |> cpu)
     push!(hist.reduce_αs_sm, softmax.(copy(m.reduce_αs)) |> cpu)
     push!(hist.activations, copy(m.activations.currentacts) |> cpu)
@@ -85,8 +85,8 @@ function (hist::histories)()#accuracies = false)
     CUDA.reclaim()
     GC.gc()
 end
-histepoch = histories([],[],[],[])
-histbatch = histories([],[],[],[])
+histepoch = historiessm([],[],[],[])
+histbatch = historiessm([],[],[],[])
 
 datesnow = Dates.now()
 base_folder = string("test/models/masked_", datesnow)

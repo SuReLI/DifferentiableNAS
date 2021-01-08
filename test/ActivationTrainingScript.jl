@@ -57,7 +57,14 @@ optimizer_w = Nesterov(0.025,0.9) #change?
 train, val = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction)
 test = get_test_data(argparams.test_fraction)
 
-function (hist::histories)()#accuracies = false)
+Base.@kwdef mutable struct historiessm
+    normal_αs_sm::Vector{Vector{Array{Float32, 1}}}
+    reduce_αs_sm::Vector{Vector{Array{Float32, 1}}}
+    activations::Vector{Dict}
+    accuracies::Vector{Float32}
+end
+
+function (hist::historiessm)()#accuracies = false)
     push!(hist.normal_αs_sm, softmax.(copy(m.normal_αs)) |> cpu)
     push!(hist.reduce_αs_sm, softmax.(copy(m.reduce_αs)) |> cpu)
     push!(hist.activations, copy(m.activations.currentacts) |> cpu)
@@ -65,8 +72,8 @@ function (hist::histories)()#accuracies = false)
     CUDA.reclaim()
     GC.gc()
 end
-histepoch = histories([],[],[],[])
-histbatch = histories([],[],[],[])
+histepoch = historiessm([],[],[],[])
+histbatch = historiessm([],[],[],[])
 
 datesnow = Dates.now()
 base_folder = string("test/models/darts_", datesnow)
@@ -93,4 +100,4 @@ cbepoch = CbAll(CUDA.reclaim, histepoch, save_progress, CUDA.reclaim)
 cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)
 
 acts = activationpre(loss, m, val)
-Flux.@epochs 10 Activationtrain1st!(loss, m, train, val, optimizer_α, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)
+Flux.@epochs 10 Activationtrain1st!(loss, m, train, val, optimizer_α, optimizer_w, acts)

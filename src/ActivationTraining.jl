@@ -29,6 +29,21 @@ function collectweights(model)
     end
 end
 
+"""
+for (i,cell) in enumerate(m.cells)
+    #cell.reduction
+    for (j,mixedop) in enumerate(cell.mixedops)
+        for (k,op) in enumerate(mixedop.ops)
+            for (l,layer) in enumerate(op.op)
+                if typeof(layer) <: Flux.BatchNorm
+                    @show (i,j,k,l,layer.λ)
+                end
+            end
+            #@show [typeof(p) for p in Flux.params(op.op).params]
+        end
+    end
+end
+"""
 
 connectstrings = vcat([[string(j,"-",i) for j = 1:i-1] for i = 3:6]...)
 axlab = vcat([string("n",e) for e in connectstrings],[string("r",e) for e in connectstrings])
@@ -131,9 +146,8 @@ function activationpre(loss, model, val)
         CUDA.reclaim()
         GC.gc()
         ac1 = activationupdatesd(model)
-        push(acts, ac1)
+        push!(acts, ac1)
         CUDA.reclaim()
-        cbbatch()
     end
     acts
 end

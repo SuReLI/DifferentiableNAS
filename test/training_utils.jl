@@ -15,6 +15,7 @@ include("CIFAR10.jl")
     batchsize::Int = 64
     throttle_::Int = 20
     val_split::Float32 = 0.5
+    trainval_fraction::Float32 = 1.0
     test_fraction::Float32 = 1.0
 end
 
@@ -61,7 +62,7 @@ end
 function (hist::histories)()
     push!(hist.normal_αs_sm, copy(m.normal_αs) |> cpu)
     push!(hist.reduce_αs_sm, copy(m.reduce_αs) |> cpu)
-    push!(hist.activations, m.activations |> cpu)
+    #push!(hist.activations, m.activations |> cpu)
     #push!(hist.accuracies, accuracy_batched(m, val |> gpu))
 end
 
@@ -70,12 +71,13 @@ Base.@kwdef mutable struct historiessm
     normal_αs_sm::Vector{Vector{Array{Float32, 1}}}
     reduce_αs_sm::Vector{Vector{Array{Float32, 1}}}
     activations::Vector{Dict}
+    accuracies::Vector{Float32}
 end
 
 function (hist::historiessm)()
     push!(hist.normal_αs_sm, softmax.(copy(m.normal_αs)) |> cpu)
     push!(hist.reduce_αs_sm, softmax.(copy(m.reduce_αs)) |> cpu)
-    push!(hist.activations, copy(m.activations.currentacts) |> cpu)
+    #push!(hist.activations, copy(m.activations.currentacts) |> cpu)
     CUDA.reclaim()
     GC.gc()
 end

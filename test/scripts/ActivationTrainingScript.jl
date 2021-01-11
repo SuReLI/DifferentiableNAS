@@ -9,9 +9,8 @@ using Distributions
 using BSON
 using Dates
 using Plots
-#using TensorBoardLogger
-#using Logging
-include("CIFAR10.jl")
+include("../CIFAR10.jl")
+include("../training_utils.jl")
 
 @with_kw struct trial_params
     epochs::Int = 50

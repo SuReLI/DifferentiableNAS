@@ -184,7 +184,7 @@ Zygote.@adjoint function my_softmax(xs; dims = 1)
     end
 end
 
-struct Op
+struct OpActs
     name::String
     op::Any
 end
@@ -199,7 +199,7 @@ function showlayer(x::AbstractArray, layer, opname::String, outs::Array{Array{Fl
     out
 end
 
-function (opwrap::Op)(xin::AbstractArray, acts::Dict, cellid::Int64)
+function (opwrap::OpActs)(xin::AbstractArray, acts::Dict, cellid::Int64)
     outs = Array{Array{Float32,3}}(undef,0)
     xout =
         foldl((x, layer) -> showlayer(x, layer, opwrap.name, outs), opwrap.op, init = xin)
@@ -215,7 +215,14 @@ function (opwrap::Op)(xin::AbstractArray, acts::Dict, cellid::Int64)
     xout
 end
 
-function (opwrap::Op)(xin::AbstractArray, acts::Nothing)
+Flux.@functor OpActs
+
+struct Op
+    name::String
+    op::Any
+end
+
+function (opwrap::Op)(xin::AbstractArray, acts::Union{Dict,Nothing}, cellid::Int64 = 0)
     opwrap.op(xin)
 end
 
@@ -227,15 +234,21 @@ struct MixedOp
     ops::AbstractArray
 end
 
-MixedOp(cellid::Int64, name::String, channels::Int64, stride::Int64) =
+function MixedOp(cellid::Int64, name::String, channels::Int64, stride::Int64, track_acts::Bool = false)
+    if track_acts
+        op = OpActs
+    else
+        op = Op
+    end
     MixedOp(
         cellid,
         name,
         [
-            Op(string(name, "-", prim), OPS[prim](channels, stride, 1) |> gpu)
+            op(string(name, "-", prim), OPS[prim](channels, stride, 1) |> gpu)
             for prim in PRIMITIVES
-        ],
+        ]
     ) |> gpu
+end
 
 function (m::MixedOp)(
     x::AbstractArray,
@@ -265,7 +278,8 @@ function Cell(
     reduce_previous::Bool,
     steps::Int64,
     multiplier::Int64,
-    cellid::Int64
+    cellid::Int64,
+    track_acts::Bool = false
 )
     if reduce_previous
         prelayer1 = FactorizedReduce(channels_before_last, channels, 2) |> gpu
@@ -277,7 +291,7 @@ function Cell(
     for i = 3:steps+2 #op output
         for j = 1:i-1 #op input
             reduce && j < 3 ? stride = 2 : stride = 1
-            mixedop = MixedOp(cellid, string(j, "-", i), channels, stride) |> gpu
+            mixedop = MixedOp(cellid, string(j, "-", i), channels, stride, track_acts) |> gpu
             push!(mixedops, mixedop)
         end
     end
@@ -337,6 +351,7 @@ function DARTSModel(;
     steps::Int64 = 4,
     mult::Int64 = 4,
     stem_mult::Int64 = 3,
+    track_acts::Bool = false
 )
     channels_current = channels * stem_mult
     stem =
@@ -365,7 +380,8 @@ function DARTSModel(;
                 reduce_previous,
                 steps,
                 mult,
-                i
+                i,
+                track_acts
             ) |> gpu
         push!(cells, cell)
 

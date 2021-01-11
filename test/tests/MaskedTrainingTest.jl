@@ -36,5 +36,5 @@ using Flux
         done_αs[2][i][i%8+1] = 1
     end
     rn, row, inds, perturbs = DifferentiableNAS.perturb(done_αs)
-    @test rn = -1
+    @test rn == -1
 end

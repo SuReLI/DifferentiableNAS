@@ -11,6 +11,7 @@ using Distributions
 using BSON
 using Plots
 include("CIFAR10.jl")
+include("training_utils.jl")
 
 @with_kw struct trial_params
     epochs::Int = 50
@@ -21,38 +22,65 @@ include("CIFAR10.jl")
     test_fraction::Float32 = 1.0
 end
 
-file_name = "test/models/osirim/masked_2021-01-05T18:40:26.49/histbatch.bson"
-BSON.@load file_name histbatch #argparams
+sm = true
+folder_name = "test/models/osirim/masked_2021-01-07T10:40:59.091"
+file_name = string(folder_name, "/histbatch.bson")
+BSON.@load file_name histbatch
 
 #file_name = "test/models/pretrainedmaskprogress2020-12-19T13:59:31.902.bson"
 #BSON.@load file_name histepoch histbatch
 
 connects = vcat([[(j,i) for j = 1:i-1] for i = 3:6]...)
 
-
-n_y_min = minimum([softmax(a[i])[j] for a in histbatch.normal_αs for i in 1:14 for j in 1:8])
-n_y_max = maximum([softmax(a[i])[j] for a in histbatch.normal_αs for i in 1:14 for j in 1:8])
-p = Vector(undef, 14)
-for i = 1:14
-    p[i] = plot(title = string("Op ",connects[i][1],"->",connects[i][2]), ylim=(n_y_min,n_y_max), legend=false)
-    for j = 1:8
-        plot!([softmax(a[i])[j] for a in histbatch.normal_αs], label=PRIMITIVES[j])
+if !sm
+    n_y_min = minimum([softmax(a[i])[j] for a in histbatch.normal_αs for i in 1:14 for j in 1:8])
+    n_y_max = maximum([softmax(a[i])[j] for a in histbatch.normal_αs for i in 1:14 for j in 1:8])
+    p = Vector(undef, 14)
+    for i = 1:14
+        p[i] = plot(title = string("Op ",connects[i][1],"->",connects[i][2]), ylim=(n_y_min,n_y_max), legend=false)
+        for j = 1:8
+            plot!([softmax(a[i])[j] for a in histbatch.normal_αs], label=PRIMITIVES[j])
+        end
     end
-end
-plot(p..., layout = (2,7), size = (2200,600));
-savefig("test/models/fig_n.png")
+    plot(p..., layout = (2,7), size = (2200,600));
+    savefig(string(folder_name, "fig_n.png"))
 
-r_y_min = minimum([softmax(a[i])[j] for a in histbatch.reduce_αs for i in 1:14 for j in 1:8])
-r_y_max = maximum([softmax(a[i])[j] for a in histbatch.reduce_αs for i in 1:14 for j in 1:8])
-p = Vector(undef, 14)
-for i = 1:14
-    p[i] = plot(title = string("Op ",connects[i][1],"->",connects[i][2]), ylim=(r_y_min,r_y_max), legend=false)
-    for j = 1:8
-        plot!([softmax(a[i])[j] for a in histbatch.reduce_αs], label=PRIMITIVES[j])
+    r_y_min = minimum([softmax(a[i])[j] for a in histbatch.reduce_αs for i in 1:14 for j in 1:8])
+    r_y_max = maximum([softmax(a[i])[j] for a in histbatch.reduce_αs for i in 1:14 for j in 1:8])
+    p = Vector(undef, 14)
+    for i = 1:14
+        p[i] = plot(title = string("Op ",connects[i][1],"->",connects[i][2]), ylim=(r_y_min,r_y_max), legend=false)
+        for j = 1:8
+            plot!([softmax(a[i])[j] for a in histbatch.reduce_αs], label=PRIMITIVES[j])
+        end
     end
+    plot(p..., layout = (2,7), size = (2200,600));
+    savefig(string(folder_name, "/fig_r.png"))
+else
+    n_y_min = minimum([a[i][j] for a in histbatch.normal_αs_sm for i in 1:14 for j in 1:8])
+    n_y_max = maximum([a[i][j] for a in histbatch.normal_αs_sm for i in 1:14 for j in 1:8])
+    p = Vector(undef, 14)
+    for i = 1:14
+        p[i] = plot(title = string("Op ",connects[i][1],"->",connects[i][2]), ylim=(n_y_min,n_y_max), legend=false)
+        for j = 1:8
+            plot!([a[i][j] for a in histbatch.normal_αs_sm], label=PRIMITIVES[j])
+        end
+    end
+    plot(p..., layout = (2,7), size = (2200,600));
+    savefig(string(folder_name, "/fig_n.png"))
+
+    r_y_min = minimum([a[i][j] for a in histbatch.reduce_αs_sm for i in 1:14 for j in 1:8])
+    r_y_max = maximum([a[i][j] for a in histbatch.reduce_αs_sm for i in 1:14 for j in 1:8])
+    p = Vector(undef, 14)
+    for i = 1:14
+        p[i] = plot(title = string("Op ",connects[i][1],"->",connects[i][2]), ylim=(r_y_min,r_y_max), legend=false)
+        for j = 1:8
+            plot!([a[i][j] for a in histbatch.reduce_αs_sm], label=PRIMITIVES[j])
+        end
+    end
+    plot(p..., layout = (2,7), size = (2200,600));
+    savefig(string(folder_name, "/fig_r.png"))
 end
-plot(p..., layout = (2,7), size = (2200,600));
-savefig("test/models/osirim/masked_2021-01-05T18:40:26.49/fig_r.png")
 
 #normal_ = m_cpu.normal_αs
 #reduce_ = m_cpu.reduce_αs

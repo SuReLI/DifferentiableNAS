@@ -2,13 +2,13 @@ using DifferentiableNAS
 using Flux
 using CUDA
 using Distributions: Bernoulli
-include("CIFAR10.jl")
+include("../CIFAR10.jl")
 
 @testset "DARTS MixedOp" begin
     steps = 4
     k = floor(Int, steps^2/2+3*steps/2)
     num_ops = length(PRIMITIVES)
-    mo = MixedOp("1-2",4,1)  |> gpu
+    mo = MixedOp(1,"1-2",4,1)  |> gpu
     @test length(Flux.params(mo).order |> cpu) > 0
     data = rand(Float32,8,8,4,2)  |> gpu
     α = rand(Float32, num_ops)  |> gpu
@@ -23,7 +23,7 @@ end
     k = floor(Int, steps^2/2+3*steps/2)
     num_ops = length(PRIMITIVES)
     data = rand(Float32,8,8,4,2) |> gpu
-    cell = Cell(4, 4, 1, false, false, 4, 4) |> gpu
+    cell = Cell(4, 4, 1, false, false, 4, 4, 1) |> gpu
     @test length(Flux.params(cell).order) > 0
     as = [2e-3*(rand(num_ops).-0.5) |> f32 |> gpu  for _ in 1:k]
     @test size(data) == size(cell(data, data, as))
@@ -37,7 +37,7 @@ end
     num_ops = length(PRIMITIVES)
     data = rand(Float32,8,8,4,2) |> gpu
     masked_αs = [2e-3*(rand(num_ops).-0.5).*rand(Bernoulli(),num_ops) |> f32 |> gpu  for _ in 1:k]
-    m = DARTSModel() |> gpu
+    m = DARTSModel(track_acts = true) |> gpu
     @test length(Flux.params(m).order) > 1
     @test length(all_αs(m).order) + length(all_ws(m).order) == length(Flux.params(m).order)
     @test length(Flux.params(m.cells).order) > 1

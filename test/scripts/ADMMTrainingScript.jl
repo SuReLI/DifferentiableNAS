@@ -8,7 +8,8 @@ using CUDA
 using Distributions
 using BSON
 using Dates
-include("CIFAR10.jl")
+include("../CIFAR10.jl")
+include("../training_utils.jl")
 @nograd onehotbatch
 
 @with_kw struct trial_params

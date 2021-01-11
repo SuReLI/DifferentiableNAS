@@ -11,7 +11,8 @@ using Dates
 using Plots
 using Colors
 using ColorBrewer
-include("CIFAR10.jl")
+include("../CIFAR10.jl")
+include("../training_utils.jl")
 @nograd onehotbatch
 
 @with_kw struct trial_params
@@ -118,4 +119,3 @@ cbepoch = CbAll(acccb, histepoch, save_progress)
 m_eval = DARTSEvalModel(normal_, reduce_, num_cells=20, channels=36) |> gpu
 optimizer = Nesterov(3e-4,0.9)
 Flux.@epochs 10 DARTSevaltrain1st!(loss, m_eval, train, optimizer; cbepoch = cbepoch)
-

@@ -8,12 +8,13 @@ using Zygote
 using LinearAlgebra
 
 include("DARTSModel.jl")
+
 include("DARTSTraining.jl")
 include("ActivationTraining.jl")
 include("MaskedTraining.jl")
 include("ScalingTraining.jl")
 include("ADMMTraining.jl")
+
 include("utils.jl")
-#include("visualize.jl")
 
 end # module

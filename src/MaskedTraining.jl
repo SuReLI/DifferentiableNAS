@@ -91,10 +91,10 @@ function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () ->
         to_remove = sortperm(vals)[1:length(vals)-1]
         if rn == 1
             model.normal_αs[row][to_remove] .= -Inf32
-            display((row, softmax(model.normal_αs[row])))
+            display((rn, row, softmax(model.normal_αs[row])))
         else
             model.reduce_αs[row][to_remove] .= -Inf32
-            display((row, softmax(model.reduce_αs[row])))
+            display((rn. row, softmax(model.reduce_αs[row])))
         end
     end
     cbbatch()

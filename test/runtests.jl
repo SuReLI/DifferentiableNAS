@@ -1,4 +1,5 @@
 using Test
 
 include("CIFAR10.jl")
-include("DARTSModelTest.jl")
+include("tests/DARTSModelTest.jl")
+include("tests/MaskedTrainingTest.jl")

@@ -4,7 +4,7 @@ using Flux: throttle, logitcrossentropy, onecold, onehotbatch
 using Zygote: @nograd
 using StatsBase: mean
 using CUDA
-include("CIFAR10.jl")
+include(".../CIFAR10.jl")
 @nograd onehotbatch
 @nograd softmax
 

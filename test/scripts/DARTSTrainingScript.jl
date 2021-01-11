@@ -24,8 +24,8 @@ optimizer_w = Nesterov(0.025,0.9) #change?
 train, val = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction)
 test = get_test_data(argparams.test_fraction)
 
-histepoch = histories([],[],[],[])
-histbatch = histories([],[],[],[])
+histepoch = historiessm([],[],[],[])
+histbatch = historiessm([],[],[],[])
 
 datesnow = Dates.now()
 base_folder = string("test/models/darts_", datesnow)

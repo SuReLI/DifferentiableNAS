@@ -33,18 +33,41 @@ runall(f) = f
 runall(fs::AbstractVector) = () -> foreach(call, fs)
 
 all_αs(model::DARTSModel) = Flux.params([model.normal_αs, model.reduce_αs])
-all_ws(model::DARTSModel) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
+function all_ws_sansbn(model::DARTSModel)
+    all_w = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
+    for (i,cell) in enumerate(model.cells)
+        for (j,mixedop) in enumerate(cell.mixedops)
+            for (k,op) in enumerate(mixedop.ops)
+                for (l,layer) in enumerate(op.op)
+                    if typeof(layer) <: Flux.BatchNorm
+                        delete!(all_w, layer.γ)
+                        delete!(all_w, layer.β)
+                    end
+                end
+            end
+        end
+    end
+    for (l,layer) in enumerate(model.stem.layers)
+        if typeof(layer) <: Flux.BatchNorm
+            delete!(all_w, layer.γ)
+            delete!(all_w, layer.β)
+        end
+    end
+    all_w
+end
 
-function DARTStrain1st!(loss, model, train, val, opt_α, opt_w; cbepoch = () -> (), cbbatch = () -> ())
+
+function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, losses; cbepoch = () -> (), cbbatch = () -> ())
     local train_loss
     local val_loss
-    w = all_ws(model)
+    w = all_ws_sansbn(model)
     α = all_αs(model)
     for (train_batch, val_batch) in zip(CuIterator(train), CuIterator(val))
         gsw = gradient(w) do
             train_loss = loss(model, train_batch...)
             return train_loss
         end
+        losses[1] = train_loss
         foreach(CUDA.unsafe_free!, train_batch)
         Flux.Optimise.update!(opt_w, w, gsw)
         CUDA.reclaim()
@@ -52,6 +75,7 @@ function DARTStrain1st!(loss, model, train, val, opt_α, opt_w; cbepoch = () -> 
             val_loss = loss(model, val_batch...)
             return val_loss
         end
+        losses[2] = val_loss
         foreach(CUDA.unsafe_free!, val_batch)
         Flux.Optimise.update!(opt_α, α, gsα)
         CUDA.reclaim()

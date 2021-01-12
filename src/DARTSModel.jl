@@ -17,20 +17,20 @@ using CUDA
 using Zygote: @adjoint, dropgrad
 using Distributions
 
-trainable(bn::BatchNorm) = () #TODO move to script?
+#trainable(bn::BatchNorm) = () #TODO move to script?
 
 ReLUConvBN(channels_in, channels_out, kernel_size, stride, pad) =
     Chain(
         x -> relu.(x),
-        Conv(kernel_size, channels_in => channels_out, bias = Flux.Zeros()),
+        Conv(kernel_size, channels_in => channels_out, bias = false),
         BatchNorm(channels_out),
     ) |> gpu
 
 function FactorizedReduce(channels_in, channels_out, stride)
     odd =
-        Conv((1, 1), channels_in => channels_out ÷ stride, stride = (stride, stride), bias = Flux.Zeros()) |> gpu
+        Conv((1, 1), channels_in => channels_out ÷ stride, stride = (stride, stride), bias = false) |> gpu
     even =
-        Conv((1, 1), channels_in => channels_out ÷ stride, stride = (stride, stride), bias = Flux.Zeros()) |> gpu
+        Conv((1, 1), channels_in => channels_out ÷ stride, stride = (stride, stride), bias = false) |> gpu
 
     Chain(
         x -> relu.(x),
@@ -47,9 +47,9 @@ SepConv(channels_in, channels_out, kernel_size, stride, pad) =
             channels_in => channels_in,
             stride = (stride, stride),
             pad = (pad, pad),
-            bias = Flux.Zeros()
+            bias = false
         ),
-        Conv((1, 1), channels_in => channels_in, stride = (1, 1), pad = (0, 0), bias = Flux.Zeros()),
+        Conv((1, 1), channels_in => channels_in, stride = (1, 1), pad = (0, 0), bias = false),
         BatchNorm(channels_in),
         x -> relu.(x),
         DepthwiseConv(
@@ -57,9 +57,9 @@ SepConv(channels_in, channels_out, kernel_size, stride, pad) =
             channels_in => channels_in,
             pad = (pad, pad),
             stride = (1, 1),
-            bias = Flux.Zeros()
+            bias = false
         ),
-        Conv((1, 1), channels_in => channels_out, stride = (1, 1), pad = (0, 0), bias = Flux.Zeros()),
+        Conv((1, 1), channels_in => channels_out, stride = (1, 1), pad = (0, 0), bias = false),
         BatchNorm(channels_out),
     ) |> gpu
 
@@ -72,9 +72,9 @@ DilConv(channels_in, channels_out, kernel_size, stride, pad, dilation) =
             pad = (pad, pad),
             stride = (stride, stride),
             dilation = dilation,
-            bias = Flux.Zeros()
+            bias = false
         ),
-        Conv(kernel_size, channels_in => channels_out, stride = (1, 1), pad = (pad, pad), bias = Flux.Zeros()),
+        Conv(kernel_size, channels_in => channels_out, stride = (1, 1), pad = (pad, pad), bias = false),
         BatchNorm(channels_out),
     ) |> gpu
 
@@ -86,13 +86,13 @@ SepConv_v(channels_in, channels_out, kernel_size, stride, pad) =
             channels_in => channels_in,
             stride = (stride, stride),
             pad = (pad, pad),
-            bias = Flux.Zeros()
+            bias = false
         ),
-        Conv((1, 1), channels_in => channels_in, stride = (1, 1), pad = (0, 0), bias = Flux.Zeros()),
+        Conv((1, 1), channels_in => channels_in, stride = (1, 1), pad = (0, 0), bias = false),
         BatchNorm(channels_in),
         x -> relu.(x),
-        Conv(kernel_size, channels_in => channels_in, pad = (pad, pad), stride = (1, 1), bias = Flux.Zeros()),
-        Conv((1, 1), channels_in => channels_out, stride = (1, 1), pad = (0, 0), bias = Flux.Zeros()),
+        Conv(kernel_size, channels_in => channels_in, pad = (pad, pad), stride = (1, 1), bias = false),
+        Conv((1, 1), channels_in => channels_out, stride = (1, 1), pad = (0, 0), bias = false),
         BatchNorm(channels_out),
     ) |> gpu
 
@@ -105,9 +105,9 @@ DilConv_v(channels_in, channels_out, kernel_size, stride, pad, dilation) =
             pad = (pad * dilation, pad * dilation),
             stride = (stride, stride),
             dilation = dilation,
-            bias = Flux.Zeros()
+            bias = false
         ),
-        Conv(kernel_size, channels_in => channels_out, stride = (1, 1), pad = (pad, pad), bias = Flux.Zeros()),
+        Conv(kernel_size, channels_in => channels_out, stride = (1, 1), pad = (pad, pad), bias = false),
         BatchNorm(channels_out),
     ) |> gpu
 
@@ -175,8 +175,8 @@ OPS = Dict(
         (channels, stride, w) ->
             Chain(
                 x -> relu.(x),
-                Conv((1, 7), channels => channels, pad = (0, 3), stride = (1, stride), bias = Flux.Zeros()),
-                Conv((7, 1), channels => channels, pad = (3, 0), stride = (stride, 1), bias = Flux.Zeros()),
+                Conv((1, 7), channels => channels, pad = (0, 3), stride = (1, stride), bias = false),
+                Conv((7, 1), channels => channels, pad = (3, 0), stride = (stride, 1), bias = false),
                 BatchNorm(channels),
             ) |> gpu,
 )
@@ -363,7 +363,7 @@ function DARTSModel(;
     channels_current = channels * stem_mult
     stem =
         Chain(
-            Conv((3, 3), 3 => channels_current, pad = (1, 1), bias = Flux.Zeros()),
+            Conv((3, 3), 3 => channels_current, pad = (1, 1), bias = false),
             BatchNorm(channels_current),
         ) |> gpu
     channels_before_last = channels_current
@@ -542,7 +542,7 @@ function DARTSEvalModel(
 )
     channels_current = channels * stem_mult
     stem = Chain(
-        Conv((3, 3), 3 => channels_current, pad = (1, 1), bias = Flux.Zeros()),
+        Conv((3, 3), 3 => channels_current, pad = (1, 1), bias = false),
         BatchNorm(channels_current),
     )
     channels_before_last = channels_current
@@ -619,7 +619,7 @@ function DARTSEvalAuxModel(
 )
     channels_current = channels * stem_mult
     stem = Chain(
-        Conv((3, 3), 3 => channels_current, pad = (1, 1)),
+        Conv((3, 3), 3 => channels_current, pad = (1, 1), bias = false),
         BatchNorm(channels_current),
     )
     channels_before_last = channels_current
@@ -659,10 +659,10 @@ function DARTSEvalAuxModel(
     auxiliary = Chain(
         x -> relu.(x), #inplace?
         MeanPool((5, 5), pad = 0, stride = 3),
-        Conv((1, 1), channels_aux => 128, bias = Flux.Zeros()),
+        Conv((1, 1), channels_aux => 128, bias = false),
         BatchNorm(128),
         x -> relu.(x),
-        Conv((2, 2), 128 => 768, bias = Flux.Zeros()),
+        Conv((2, 2), 128 => 768, bias = false),
         BatchNorm(768),
         x -> relu.(x),
         x -> dropdims(reshape(x, size(x, 3), :), dims = 2),

@@ -12,7 +12,7 @@ using CUDA
 include("utils.jl")
 include("DARTSModel.jl")
 
-function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, losses; cbepoch = () -> (), cbbatch = () -> ())
+function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, losses=[0.0,0.0]; cbepoch = () -> (), cbbatch = () -> ())
     local train_loss
     local val_loss
     w = all_ws_sansbn(model)
@@ -41,7 +41,7 @@ end
 
 all_ws(model::DARTSEvalModel) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
 
-function DARTSevaltrain1st!(loss, model, train, opt_w, losses; cbepoch = () -> (), cbbatch = () -> ())
+function DARTSevaltrain1st!(loss, model, train, opt_w, losses=[0.0,0.0]; cbepoch = () -> (), cbbatch = () -> ())
     w = all_ws(model)
     local train_loss
     for train_batch in CuIterator(train)

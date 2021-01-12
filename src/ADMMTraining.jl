@@ -1,4 +1,4 @@
-export ADMMtrain1st!
+export ADMMtrain1st!, euclidmap, regterm
 
 using Flux
 using Flux: onehotbatch
@@ -22,7 +22,7 @@ function euclidmap(aus, cardinality)
     aus
 end
 
-function regterm(m, zs, us)
+function regterm(m::DARTSModel, zs, us)
     as = vcat([exp.(n) for n in m.normal_αs], [exp.(n) for n in m.reduce_αs])
     out = 0.0
     for (a, z, u) in zip(as, zs, us)
@@ -31,7 +31,7 @@ function regterm(m, zs, us)
     out
 end
 
-function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zs, us, ρ=1e-3, losses; cbepoch = () -> (), cbbatch = () -> ())
+function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zs, us, ρ=1e-3, losses=[0.0,0.0]; cbepoch = () -> (), cbbatch = () -> ())
     w = all_ws_sansbn(model)
     α = all_αs(model)
     local train_loss

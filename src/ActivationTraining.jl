@@ -114,7 +114,7 @@ function activationpre(loss, model, val)
     acts
 end
 
-function Activationtrain1st!(loss, model, train, val, opt_α, opt_w, baseacts, losses; cbepoch = () -> (), cbbatch = () -> ())
+function Activationtrain1st!(loss, model, train, val, opt_α, opt_w, baseacts, losses=[0.0,0.0]; cbepoch = () -> (), cbbatch = () -> ())
     local train_loss
     local val_loss
     local gsα

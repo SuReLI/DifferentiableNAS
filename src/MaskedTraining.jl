@@ -34,7 +34,7 @@ function perturb(αs::AbstractArray)
     return (-1, -1, [], [])
 end
 
-function Standardtrain1st!(accuracy, loss, model, train, opt, losses; cbepoch = () -> (), cbbatch = () -> ())
+function Standardtrain1st!(accuracy, loss, model, train, opt, losses=[0.0,0.0]; cbepoch = () -> (), cbbatch = () -> ())
     local train_loss
     w = all_ws_sansbn(model)
     for train_batch in CuIterator(train)
@@ -51,7 +51,7 @@ function Standardtrain1st!(accuracy, loss, model, train, opt, losses; cbepoch = 
     cbepoch()
 end
 
-function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () -> (), cbbatch = () -> ())
+function Maskedtrain1st!(accuracy, loss, model, train, val, opt, losses=[0.0,0.0]; cbepoch = () -> (), cbbatch = () -> ())
     w = all_ws_sansbn(model)
     for _ in 1:1
         rn, row, inds, perturbs = perturb([model.normal_αs, model.reduce_αs])

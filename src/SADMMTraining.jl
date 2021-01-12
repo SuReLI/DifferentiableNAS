@@ -107,7 +107,7 @@ collecteachrow(x) = collect(eachrow(x))
     end
 end
 
-function euclidmap(aus, cardinality)
+function euclidmaps(aus, cardinality)
     for i in 1:size(aus,1)
         sp = copy(aus[i,:])
         to_mask = sortperm(sp)[1:size(aus,2)-cardinality]
@@ -118,7 +118,7 @@ function euclidmap(aus, cardinality)
     aus
 end
 
-function regterm(m, zs, us)
+function regterms(m, zs, us)
     gs = scalingparams(m)
     out = 0.0
     for (g, z, u) in zip(collecteachrow(gs), collecteachrow(zs), collecteachrow(us))
@@ -130,11 +130,11 @@ end
 trainable(bn::BatchNorm) = (bn.β, bn.γ)
 all_ws(model::DARTSModel) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
 
-function ScalingADMMtrain1st!(loss, model, train, opt_w, zs, us, ρ=1e-3, losses; cbepoch = () -> (), cbbatch = () -> ())
+function ScalingADMMtrain1st!(loss, model, train, opt_w, zs, us, ρ=1e-3, losses=[0.0,0.0]; cbepoch = () -> (), cbbatch = () -> ())
     w = all_ws(model)
     for (i, train_batch) in zip(1:length(train), CuIterator(train))
         gsw = gradient(w) do
-            train_loss = loss(model, train_batch...) + ρ/2*regterm(model, zs, us)
+            train_loss = loss(model, train_batch...) + ρ/2*regterms(model, zs, us)
             return train_loss
         end
         losses[1] = train_loss

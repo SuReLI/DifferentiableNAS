@@ -7,6 +7,7 @@ using CUDA
 using Distributions
 using BSON
 using Dates
+using Zygote
 include("CIFAR10.jl")
 @nograd onehotbatch
 
@@ -20,7 +21,9 @@ include("CIFAR10.jl")
 end
 
 function loss(m, x, y)
-    @show logitcrossentropy(squeeze(m(x)), y)
+    out = m(x)
+    loss = logitcrossentropy(squeeze(out), y)
+    return loss
 end
 
 acccb() = @show(accuracy_batched(m, val))
@@ -59,6 +62,8 @@ Base.@kwdef mutable struct histories
     accuracies::Vector{Float32}
 end
 
+histories() = histories([],[],[],[])
+
 function (hist::histories)()
     push!(hist.normal_αs_sm, copy(m.normal_αs) |> cpu)
     push!(hist.reduce_αs_sm, copy(m.reduce_αs) |> cpu)
@@ -74,13 +79,41 @@ Base.@kwdef mutable struct historiessm
     accuracies::Vector{Float32}
 end
 
+historiessm() = historiessm([],[],[],[])
+
 function (hist::historiessm)()
+    @show losses
     push!(hist.normal_αs_sm, softmax.(copy(m.normal_αs)) |> cpu)
     push!(hist.reduce_αs_sm, softmax.(copy(m.reduce_αs)) |> cpu)
     #push!(hist.activations, copy(m.activations.currentacts) |> cpu)
     CUDA.reclaim()
     GC.gc()
 end
+
+
+Base.@kwdef mutable struct historiessml
+    normal_αs_sm::Vector{Vector{Array{Float32, 1}}}
+    reduce_αs_sm::Vector{Vector{Array{Float32, 1}}}
+    activations::Vector{Dict}
+    accuracies::Vector{Float32}
+    train_losses::Vector{Float32}
+    val_losses::Vector{Float32}
+end
+
+historiessml() = historiessml([],[],[],[],[],[])
+
+function (hist::historiessml)()
+    @show losses
+    push!(hist.normal_αs_sm, softmax.(copy(m.normal_αs)) |> cpu)
+    push!(hist.reduce_αs_sm, softmax.(copy(m.reduce_αs)) |> cpu)
+    #push!(hist.activations, copy(m.activations.currentacts) |> cpu)
+    push!(hist.train_losses, losses[1])
+    push!(hist.val_losses, losses[2])
+    CUDA.reclaim()
+    GC.gc()
+end
+
+
 struct CbAll
     cbs
 end

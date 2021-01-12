@@ -34,4 +34,6 @@ mkpath(base_folder)
 cbepoch = CbAll(CUDA.reclaim, histepoch, save_progress, CUDA.reclaim)
 cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)
 
-Flux.@epochs 10 DARTStrain1st!(loss, m, train, val, optimizer_α, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)
+losses = [0.0, 0.0]
+
+Flux.@epochs 10 DARTStrain1st!(loss, m, train, val, optimizer_α, optimizer_w, losses; cbepoch = cbepoch, cbbatch = cbbatch)

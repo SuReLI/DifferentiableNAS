@@ -24,10 +24,3 @@ function all_params(submodels)
     end
     return ps
 end
-
-Base.@kwdef mutable struct histories
-    normal_αs::Vector{Vector{Array{Float32, 1}}}
-    reduce_αs::Vector{Vector{Array{Float32, 1}}}
-    activations::Vector{Any}
-    accuracies::Vector{Float32}
-end

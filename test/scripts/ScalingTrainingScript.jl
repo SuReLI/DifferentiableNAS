@@ -23,8 +23,9 @@ optimizer_w = Nesterov(0.025,0.9) #change?
 train, val = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction)
 test = get_test_data(argparams.test_fraction)
 
-histepoch = historiessm([],[],[],[])
-histbatch = historiessm([],[],[],[])
+histepoch = historiessml()
+histbatch = historiessml()
+losses = [0.0, 0.0]
 
 datesnow = Dates.now()
 base_folder = string("test/models/scaling_", datesnow)
@@ -33,4 +34,4 @@ mkpath(base_folder)
 cbepoch = CbAll(CUDA.reclaim, histepoch, save_progress, CUDA.reclaim)
 cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)
 
-Flux.@epochs 10 Scalingtrain1st!(loss, m, train, val, optimizer_α, optimizer_w, 0.1)
+Flux.@epochs 10 Scalingtrain1st!(loss, m, train, val, optimizer_α, optimizer_w, 0.1, losses)

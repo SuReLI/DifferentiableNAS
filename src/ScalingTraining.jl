@@ -88,31 +88,10 @@ function scalingreg(model)
     collectscales
 end
 
-function flatten_grads(grads)
-    xs = Zygote.Buffer([])
-    fmap(grads) do x
-        x isa AbstractArray && push!(xs, x)
-        #println("x ",x)
-        return x
-    end
-    flat_gs = vcat(vec.(copy(xs))...)
-end
-
-function update_all!(opt, ps::Params, gs)
-    for (p, g) in zip(ps, gs)
-        g == nothing && continue
-        Flux.Optimise.update!(opt, p, g)
-    end
-end
-
-runall(f) = f
-runall(fs::AbstractVector) = () -> foreach(call, fs)
-
-all_αs(model::DARTSModel) = Flux.params([model.normal_αs, model.reduce_αs])
 all_ws(model::DARTSModel) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
 
 i = 1
-function Scalingtrain1st!(loss, model, train, val, opt_α, opt_w, λ=0.0001; cbepoch = () -> (), cbbatch = () -> ())
+function Scalingtrain1st!(loss, model, train, val, opt_α, opt_w, λ=0.0001, losses; cbepoch = () -> (), cbbatch = () -> ())
     local train_loss
     local val_loss
     local gsα
@@ -126,6 +105,7 @@ function Scalingtrain1st!(loss, model, train, val, opt_α, opt_w, λ=0.0001; cbe
             train_loss = loss(model, train_batch...) + λ*scalingreg(model)#sum([sum(abs, ss) for ss in scalingupdate(model)])
             return train_loss
         end
+        losses[1] = train_loss
         foreach(CUDA.unsafe_free!, train_batch)
         Flux.Optimise.update!(opt_w, w, gsw)
         CUDA.reclaim()
@@ -134,6 +114,7 @@ function Scalingtrain1st!(loss, model, train, val, opt_α, opt_w, λ=0.0001; cbe
             val_loss = loss(model, val_batch...)
             return val_loss
         end
+        losses[2] = val_loss
         foreach(CUDA.unsafe_free!, val_batch)
         CUDA.reclaim()
         GC.gc()
@@ -145,9 +126,6 @@ function Scalingtrain1st!(loss, model, train, val, opt_α, opt_w, λ=0.0001; cbe
         GC.gc()
         cbbatch()
     end
-    #ac1 = activationupdatesd(model)
-    @show size(scalingupdate(model)|>cpu)
-    @show size(hcat((fakeg |> cpu)...))
     p1 = heatmap(axlab, PRIMITIVES, scalingupdate(model)|>cpu, xrotation = 90, title = "Mean Scaling Delta")
     #ac2 = activationupdatema(model)
     #p2 = heatmap(axlab, PRIMITIVES, hcat((ac2 |> cpu)...), xrotation = 90, title = "Activation Mean of Absolute Value")

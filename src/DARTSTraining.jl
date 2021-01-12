@@ -1,4 +1,4 @@
-export DARTStrain1st!, DARTStrain2nd!, DARTSevaltrain1st!, all_ws, all_αs
+export DARTStrain1st!, DARTStrain2nd!, DARTSevaltrain1st!, all_ws_sansbn, all_αs
 
 using Flux
 using Flux: onehotbatch
@@ -11,51 +11,6 @@ using LinearAlgebra
 using CUDA
 include("utils.jl")
 include("DARTSModel.jl")
-
-function flatten_grads(grads)
-    xs = Zygote.Buffer([])
-    fmap(grads) do x
-        x isa AbstractArray && push!(xs, x)
-        #println("x ",x)
-        return x
-    end
-    flat_gs = vcat(vec.(copy(xs))...)
-end
-
-function update_all!(opt, ps::Params, gs)
-    for (p, g) in zip(ps, gs)
-        g == nothing && continue
-        Flux.Optimise.update!(opt, p, g)
-    end
-end
-
-runall(f) = f
-runall(fs::AbstractVector) = () -> foreach(call, fs)
-
-all_αs(model::DARTSModel) = Flux.params([model.normal_αs, model.reduce_αs])
-function all_ws_sansbn(model::DARTSModel)
-    all_w = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
-    for (i,cell) in enumerate(model.cells)
-        for (j,mixedop) in enumerate(cell.mixedops)
-            for (k,op) in enumerate(mixedop.ops)
-                for (l,layer) in enumerate(op.op)
-                    if typeof(layer) <: Flux.BatchNorm
-                        delete!(all_w, layer.γ)
-                        delete!(all_w, layer.β)
-                    end
-                end
-            end
-        end
-    end
-    for (l,layer) in enumerate(model.stem.layers)
-        if typeof(layer) <: Flux.BatchNorm
-            delete!(all_w, layer.γ)
-            delete!(all_w, layer.β)
-        end
-    end
-    all_w
-end
-
 
 function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, losses; cbepoch = () -> (), cbbatch = () -> ())
     local train_loss
@@ -84,6 +39,31 @@ function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, losses; cbepoch 
     cbepoch()
 end
 
+all_ws(model::DARTSEvalModel) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
+
+function DARTSevaltrain1st!(loss, model, train, opt_w, losses; cbepoch = () -> (), cbbatch = () -> ())
+    w = all_ws(model)
+    local train_loss
+    for train_batch in CuIterator(train)
+        gsw = gradient(w) do
+            train_loss = loss(model, train_batch...)
+            return train_loss
+        end
+        losses[1] = train_loss
+        CUDA.reclaim()
+        GC.gc()
+        Flux.Optimise.update!(opt_w, w, gsw)
+        cbbatch()
+    end
+    cbepoch()
+end
+
+function update_all!(opt, ps::Params, gs)
+    for (p, g) in zip(ps, gs)
+        g == nothing && continue
+        Flux.Optimise.update!(opt, p, g)
+    end
+end
 
 function DARTStrain2nd!(loss, model, train, val, opt; cb = () -> ())
     function grad_loss(model, ps, batch, verbose = false)
@@ -153,30 +133,4 @@ function DARTStrain2nd!(loss, model, train, val, opt; cb = () -> ())
 
         cb()
     end
-end
-
-all_ws(model::DARTSEvalModel) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
-
-function DARTSevaltrain1st!(loss, model, train, opt_w; cbepoch = () -> ())
-    function grad_loss(model, ps, batch, verbose = false)
-        gs = gradient(ps) do
-            loss(model, batch...)
-        end
-    end
-
-    w = all_ws(model)
-
-    for train_batch in CuIterator(train)
-        gsw = grad_loss(model, w, train_batch)
-        CUDA.reclaim()
-        GC.gc()
-        Flux.Optimise.update!(opt_w, w, gsw)
-        CUDA.reclaim()
-        GC.gc()
-    end
-    CUDA.reclaim()
-    GC.gc()
-    cbepoch()
-    CUDA.reclaim()
-    GC.gc()
 end

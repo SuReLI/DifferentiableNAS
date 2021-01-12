@@ -97,23 +97,6 @@ function scalingreg(model)
     collectscales
 end
 
-function flatten_grads(grads)
-    xs = Zygote.Buffer([])
-    fmap(grads) do x
-        x isa AbstractArray && push!(xs, x)
-        #println("x ",x)
-        return x
-    end
-    flat_gs = vcat(vec.(copy(xs))...)
-end
-
-function update_all!(opt, ps::Params, gs)
-    for (p, g) in zip(ps, gs)
-        g == nothing && continue
-        Flux.Optimise.update!(opt, p, g)
-    end
-end
-
 collecteachrow(x) = collect(eachrow(x))
 
 @adjoint function collecteachrow(x)
@@ -135,7 +118,6 @@ function euclidmap(aus, cardinality)
     aus
 end
 
-
 function regterm(m, zs, us)
     gs = scalingparams(m)
     out = 0.0
@@ -145,21 +127,17 @@ function regterm(m, zs, us)
     out
 end
 
-runall(f) = f
-runall(fs::AbstractVector) = () -> foreach(call, fs)
-
 trainable(bn::BatchNorm) = (bn.β, bn.γ)
-all_αs(model::DARTSModel) = Flux.params([model.normal_αs, model.reduce_αs])
 all_ws(model::DARTSModel) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
 
-i = 1
-function ScalingADMMtrain1st!(loss, model, train, opt_w, zs, us, ρ=1e-3; cbepoch = () -> (), cbbatch = () -> ())
+function ScalingADMMtrain1st!(loss, model, train, opt_w, zs, us, ρ=1e-3, losses; cbepoch = () -> (), cbbatch = () -> ())
     w = all_ws(model)
     for (i, train_batch) in zip(1:length(train), CuIterator(train))
         gsw = gradient(w) do
             train_loss = loss(model, train_batch...) + ρ/2*regterm(model, zs, us)
             return train_loss
         end
+        losses[1] = train_loss
         foreach(CUDA.unsafe_free!, train_batch)
         Flux.Optimise.update!(opt_w, w, gsw)
         CUDA.reclaim()

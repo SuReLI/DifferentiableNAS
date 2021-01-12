@@ -23,12 +23,14 @@ val_batchsize = 32
 train, val = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction, val_batchsize)
 test = get_test_data(argparams.test_fraction)
 
-histepoch = historiessm([],[],[],[])
-histbatch = historiessm([],[],[],[])
+histepoch = historiessml()
+histbatch = historiessml()
+losses = [0.0, 0.0]
 
 datesnow = Dates.now()
 base_folder = string("test/models/masked_", datesnow)
 mkpath(base_folder)
+
 cbepoch = CbAll(CUDA.reclaim, GC.gc, histepoch, save_progress, CUDA.reclaim, GC.gc)
 cbbatch = CbAll(CUDA.reclaim, GC.gc, histbatch, CUDA.reclaim, GC.gc)
 
@@ -39,5 +41,5 @@ m = DARTSModel()
 #Flux.loadparams!(m, pars)
 m = gpu(m)
 CUDA.memory_status()
-Flux.@epochs 10 Standardtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)
-Flux.@epochs 10 Maskedtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w; cbepoch = cbepoch, cbbatch = cbbatch)
+Flux.@epochs 10 Standardtrain1st!(accuracy_batched, loss, m, train, optimizer_w, losses; cbepoch = cbepoch, cbbatch = cbbatch)
+Flux.@epochs 10 Maskedtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w, losses; cbepoch = cbepoch, cbbatch = cbbatch)

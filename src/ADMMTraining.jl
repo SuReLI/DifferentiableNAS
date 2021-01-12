@@ -9,26 +9,8 @@ using Zygote
 using Zygote: @nograd
 using LinearAlgebra
 using CUDA
-#using TensorBoardLogger
 include("utils.jl")
 include("DARTSModel.jl")
-
-function flatten_grads(grads)
-    xs = Zygote.Buffer([])
-    fmap(grads) do x
-        x isa AbstractArray && push!(xs, x)
-        #println("x ",x)
-        return x
-    end
-    flat_gs = vcat(vec.(copy(xs))...)
-end
-
-function update_all!(opt, ps::Params, gs)
-    for (p, g) in zip(ps, gs)
-        g == nothing && continue
-        Flux.Optimise.update!(opt, p, g)
-    end
-end
 
 function euclidmap(aus, cardinality)
     for i in 1:size(aus,1)
@@ -49,20 +31,17 @@ function regterm(m, zs, us)
     out
 end
 
-runall(f) = f
-runall(fs::AbstractVector) = () -> foreach(call, fs)
-
-all_αs(model::DARTSModel) = Flux.params([model.normal_αs, model.reduce_αs])
-all_ws(model::DARTSModel) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
-
-function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zs, us, ρ=1e-3; cbepoch = () -> (), cbbatch = () -> ())
-    w = all_ws(model)
+function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zs, us, ρ=1e-3, losses; cbepoch = () -> (), cbbatch = () -> ())
+    w = all_ws_sansbn(model)
     α = all_αs(model)
+    local train_loss
+    local val_loss
     for (i, train_batch, val_batch) in zip(1:length(train), CuIterator(train), CuIterator(val))
         gsw = gradient(w) do
             train_loss = loss(model, train_batch...)
             return train_loss
         end
+        losses[1] = train_loss
         foreach(CUDA.unsafe_free!, train_batch)
         Flux.Optimise.update!(opt_w, w, gsw)
         CUDA.reclaim()
@@ -70,6 +49,7 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zs, us, ρ=1e-3; 
             val_loss = loss(model, val_batch...) + ρ/2*regterm(model, zs, us)
             return val_loss
         end
+        losses[2] = val_loss
         foreach(CUDA.unsafe_free!, val_batch)
         Flux.Optimise.update!(opt_α, α, gsα)
         CUDA.reclaim()

@@ -23,27 +23,10 @@ function collectweights(model)
                         @show (i,j,k,l,norm(layer.weight),size(layer.weight))
                     end
                 end
-                #@show [typeof(p) for p in Flux.params(op.op).params]
             end
         end
     end
 end
-
-"""
-for (i,cell) in enumerate(m.cells)
-    #cell.reduction
-    for (j,mixedop) in enumerate(cell.mixedops)
-        for (k,op) in enumerate(mixedop.ops)
-            for (l,layer) in enumerate(op.op)
-                if typeof(layer) <: Flux.BatchNorm
-                    @show (i,j,k,l,layer.λ)
-                end
-            end
-            #@show [typeof(p) for p in Flux.params(op.op).params]
-        end
-    end
-end
-"""
 
 connectstrings = vcat([[string(j,"-",i) for j = 1:i-1] for i = 3:6]...)
 axlab = vcat([string("n",e) for e in connectstrings],[string("r",e) for e in connectstrings])
@@ -112,27 +95,6 @@ function activationupdatesd(model)
 end
 
 
-
-function flatten_grads(grads)
-    xs = Zygote.Buffer([])
-    fmap(grads) do x
-        x isa AbstractArray && push!(xs, x)
-        #println("x ",x)
-        return x
-    end
-    flat_gs = vcat(vec.(copy(xs))...)
-end
-
-function update_all!(opt, ps::Params, gs)
-    for (p, g) in zip(ps, gs)
-        g == nothing && continue
-        Flux.Optimise.update!(opt, p, g)
-    end
-end
-
-runall(f) = f
-runall(fs::AbstractVector) = () -> foreach(call, fs)
-
 all_αs(model::DARTSModel) = Flux.params([model.normal_αs, model.reduce_αs])
 all_ws(model::DARTSModel) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
 
@@ -152,7 +114,7 @@ function activationpre(loss, model, val)
     acts
 end
 
-function Activationtrain1st!(loss, model, train, val, opt_α, opt_w, baseacts; cbepoch = () -> (), cbbatch = () -> ())
+function Activationtrain1st!(loss, model, train, val, opt_α, opt_w, baseacts, losses; cbepoch = () -> (), cbbatch = () -> ())
     local train_loss
     local val_loss
     local gsα
@@ -166,6 +128,7 @@ function Activationtrain1st!(loss, model, train, val, opt_α, opt_w, baseacts; c
             train_loss = loss(model, train_batch...)
             return train_loss
         end
+        losses[1] = train_loss
         foreach(CUDA.unsafe_free!, train_batch)
         Flux.Optimise.update!(opt_w, w, gsw)
         CUDA.reclaim()
@@ -174,6 +137,7 @@ function Activationtrain1st!(loss, model, train, val, opt_α, opt_w, baseacts; c
             val_loss = loss(model, val_batch...)
             return val_loss
         end
+        losses[2] = val_loss
         foreach(CUDA.unsafe_free!, val_batch)
         CUDA.reclaim()
         GC.gc()
@@ -191,14 +155,7 @@ function Activationtrain1st!(loss, model, train, val, opt_α, opt_w, baseacts; c
         CUDA.reclaim()
         cbbatch()
     end
-    """
-    val_batch = val[1] |> gpu
-    gsα = gradient(α) do
-        val_loss = loss(model, val_batch...)
-        return val_loss
-    end
-    foreach(CUDA.unsafe_free!, val_batch)
-    """
+
     #ac1 = activationupdatesd(model)
     p1 = heatmap(axlab, PRIMITIVES, hcat((fakea |> cpu)...), xrotation = 90, title = "Activation Standard Deviation")
     #ac2 = activationupdatema(model)

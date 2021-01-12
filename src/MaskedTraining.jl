@@ -14,27 +14,6 @@ include("DARTSModel.jl")
 @nograd onehotbatch
 @nograd softmax
 
-function flatten_grads(grads)
-    xs = Zygote.Buffer([])
-    fmap(grads) do x
-        x isa AbstractArray && push!(xs, x)
-        return x
-    end
-    flat_gs = vcat(vec.(copy(xs))...)
-end
-
-function update_all!(opt, ps::Params, gs)
-    for (p, g) in zip(ps, gs)
-        g == nothing && continue
-        Flux.Optimise.update!(opt, p, g)
-    end
-end
-
-runall(f) = f
-runall(fs::AbstractVector) = () -> foreach(call, fs)
-
-all_ws(model::DARTSModel) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
-
 function perturb(αs::AbstractArray)
     counter = [ones(length(a)) for a in αs]
     while sum(sum(counter)) > 0
@@ -55,16 +34,15 @@ function perturb(αs::AbstractArray)
     return (-1, -1, [], [])
 end
 
-function Standardtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () -> (), cbbatch = () -> ())
-    function grad_loss(model, ps, batch, acts, verbose = false)
-        gs = gradient(ps) do
-            loss(model, batch..., acts)
-        end
-    end
-
-    w = all_ws(model)
+function Standardtrain1st!(accuracy, loss, model, train, opt, losses; cbepoch = () -> (), cbbatch = () -> ())
+    local train_loss
+    w = all_ws_sansbn(model)
     for train_batch in CuIterator(train)
-        gsw = grad_loss(model, w, train_batch)
+        gsw = gradient(w) do
+            train_loss = loss(model, train_batch...)
+            return train_loss
+        end
+        losses[1] = train_loss
         CUDA.reclaim()
         GC.gc()
         Flux.Optimise.update!(opt, w, gsw)
@@ -74,15 +52,8 @@ function Standardtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () 
 end
 
 function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () -> (), cbbatch = () -> ())
-    function grad_loss(model, ps, batch, verbose = false)
-        gs = gradient(ps) do
-            loss(model, batch...) #also log loss
-        end
-    end
-
-    w = all_ws(model)
-
-    for _ in 1:1 #14
+    w = all_ws_sansbn(model)
+    for _ in 1:1
         rn, row, inds, perturbs = perturb([model.normal_αs, model.reduce_αs])
         if rn == -1
             continue
@@ -99,7 +70,11 @@ function Maskedtrain1st!(accuracy, loss, model, train, val, opt; cbepoch = () ->
     end
     cbbatch()
     for train_batch in CuIterator(train)
-        gsw = grad_loss(model, w, train_batch)
+        gsw = gradient(w) do
+            train_loss = loss(model, train_batch...)
+            return train_loss
+        end
+        losses[1] = train_loss
         CUDA.reclaim()
         GC.gc()
         Flux.Optimise.update!(opt, w, gsw)

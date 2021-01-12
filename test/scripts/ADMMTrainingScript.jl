@@ -24,8 +24,9 @@ val_batchsize = 32
 train, val = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction, val_batchsize)
 test = get_test_data(argparams.test_fraction)
 
-histepoch = historiessm([],[],[],[])
-histbatch = historiessm([],[],[],[])
+histepoch = historiessml()
+histbatch = historiessml()
+losses = [0.0, 0.0]
 
 datesnow = Dates.now()
 base_folder = string("test/models/admm_", datesnow)
@@ -38,4 +39,4 @@ m = DARTSModel(num_cells = 4, channels = 4)
 m = gpu(m)
 zs = 0*vcat(m.normal_αs, m.reduce_αs)
 us = 0*vcat(m.normal_αs, m.reduce_αs)
-Flux.@epochs 10 ADMMtrain1st!(loss, m, train, val, optimizer_w, optimizer_α, zs, us, 1e-3; cbepoch = cbepoch, cbbatch = cbbatch)
+Flux.@epochs 10 ADMMtrain1st!(loss, m, train, val, optimizer_w, optimizer_α, zs, us, 1e-3, losses; cbepoch = cbepoch, cbbatch = cbbatch)

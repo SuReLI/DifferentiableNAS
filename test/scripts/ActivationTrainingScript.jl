@@ -22,15 +22,16 @@ optimizer_w = Nesterov(0.025,0.9) #change?
 train, val = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction)
 test = get_test_data(argparams.test_fraction)
 
-function (hist::historiessm)()
+function (hist::historiessml)()
     push!(hist.normal_αs_sm, softmax.(copy(m.normal_αs)) |> cpu)
     push!(hist.reduce_αs_sm, softmax.(copy(m.reduce_αs)) |> cpu)
     push!(hist.activations, copy(m.activations.currentacts) |> cpu)
     CUDA.reclaim()
     GC.gc()
 end
-histepoch = historiessm([],[],[],[])
-histbatch = historiessm([],[],[],[])
+histepoch = historiessml()
+histbatch = historiessml()
+losses = [0.0, 0.0]
 
 datesnow = Dates.now()
 base_folder = string("test/models/acts_", datesnow)
@@ -40,4 +41,4 @@ cbepoch = CbAll(CUDA.reclaim, histepoch, save_progress, CUDA.reclaim)
 cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)
 
 acts = activationpre(loss, m, val)
-Flux.@epochs 10 Activationtrain1st!(loss, m, train, val, optimizer_α, optimizer_w, acts)
+Flux.@epochs 10 Activationtrain1st!(loss, m, train, val, optimizer_α, optimizer_w, acts, losses)

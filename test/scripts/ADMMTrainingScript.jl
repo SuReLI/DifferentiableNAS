@@ -13,7 +13,7 @@ include("../training_utils.jl")
 @nograd onehotbatch
 
 
-argparams = trial_params(batchsize=32)
+argparams = trial_params(batchsize = 32)
 
 num_ops = length(PRIMITIVES)
 

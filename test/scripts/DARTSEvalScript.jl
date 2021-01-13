@@ -24,7 +24,7 @@ include("../training_utils.jl")
     test_fraction::Float32 = 1.0
 end
 
-argparams = eval_params(batchsize = 16, test_batchsize = 16)
+argparams = eval_params()
 
 optimiser = Optimiser(WeightDecay(3e-4),Momentum(0.025, 0.9))
 

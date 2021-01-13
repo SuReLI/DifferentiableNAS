@@ -33,10 +33,10 @@ train, val = get_processed_data(argparams.val_split, argparams.batchsize, argpar
 test = get_test_data(argparams.test_fraction, argparams.test_batchsize)
 
 
-function (hist::historiessm)()
+function (hist::historiessml)()
     push!(hist.accuracies, accuracy_batched(m_eval, val))
 end
-histepoch = historiessm([],[],[],[])
+histepoch = historiessml()
 
 datesnow = Dates.now()
 base_folder = string("test/models/eval_", datesnow)
@@ -46,8 +46,8 @@ trial_name = "test/models/alphas09.58.bson"
 
 BSON.@load trial_name normal_ reduce_
 
-cbepoch = CbAll(acccb, histepoch, save_progress)
+cbepoch = CbAll(histepoch, save_progress)
 
-m = DARTSEvalModel(normal_, reduce_, num_cells=20, channels=36) |> gpu
+m = DARTSEvalAuxModel(normal_, reduce_, num_cells=20, channels=36) |> gpu
 optimizer = Nesterov(3e-4,0.9)
 Flux.@epochs 10 DARTSevaltrain1st!(loss, m, train, optimizer; cbepoch = cbepoch)

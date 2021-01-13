@@ -22,8 +22,11 @@ function euclidmap(aus, cardinality)
     aus
 end
 
+function collect_αs(model)
+    vcat([exp.(n) for n in model.normal_αs], [exp.(n) for n in model.reduce_αs])
+end
 function regterm(m::DARTSModel, zs, us)
-    as = vcat([exp.(n) for n in m.normal_αs], [exp.(n) for n in m.reduce_αs])
+    as = collect_αs(m)
     out = 0.0
     for (a, z, u) in zip(as, zs, us)
         out += sum(abs2,a - z + u)
@@ -53,9 +56,9 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zs, us, ρ=1e-3, 
         foreach(CUDA.unsafe_free!, val_batch)
         Flux.Optimise.update!(opt_α, α, gsα)
         CUDA.reclaim()
-        if i%10 == 0
-            as = vcat([exp.(n) for n in model.normal_αs], [exp.(n) for n in model.reduce_αs])
-            display(softmax.(as))
+        if i%1 == 0
+            as = collect_αs(model)
+            display(as)
             zs = euclidmap(as+us, 1)
             display(zs)
             us += as - zs

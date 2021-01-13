@@ -56,7 +56,7 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zs, us, ρ=1e-3, 
         foreach(CUDA.unsafe_free!, val_batch)
         Flux.Optimise.update!(opt_α, α, gsα)
         CUDA.reclaim()
-        if i%1 == 0
+        if i%10 == 0
             as = collect_αs(model)
             display(as)
             zs = euclidmap(as+us, 1)

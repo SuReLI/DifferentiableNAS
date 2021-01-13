@@ -12,11 +12,11 @@ using Dates
 include("../CIFAR10.jl")
 include("../training_utils.jl")
 
-argparams = trial_params(batchsize = 32, trainval_fraction = 0.01)
+argparams = trial_params(batchsize = 32)
 
 num_ops = length(PRIMITIVES)
 
-m = DARTSModel(num_cells = 4, channels = 4) |> gpu
+m = DARTSModel() |> gpu
 
 optimizer_α = ADAM(3e-4,(0.9,0.999))
 optimizer_w = Nesterov(0.025,0.9) #change?
@@ -35,4 +35,4 @@ mkpath(base_folder)
 cbepoch = CbAll(CUDA.reclaim, histepoch, save_progress, CUDA.reclaim)
 cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)
 
-Flux.@epochs 10 DARTStrain1st!(loss, m, train, val, optimizer_α, optimizer_w, losses; cbepoch = cbepoch, cbbatch = cbbatch)
+Flux.@epochs 50 DARTStrain1st!(loss, m, train, val, optimizer_α, optimizer_w, losses; cbepoch = cbepoch, cbbatch = cbbatch)

@@ -16,11 +16,9 @@ argparams = trial_params(val_split = 0.1)
 
 num_ops = length(PRIMITIVES)
 
-optimizer_α = ADAM(3e-4,(0.9,0.999))
-optimizer_w = Nesterov(0.025,0.9) #change?
+optimiser_w = Optimiser(WeightDecay(3e-4),Momentum(0.025, 0.9))
 
-val_batchsize = 32
-train, val = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction, val_batchsize)
+train, val = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction)
 test = get_test_data(argparams.test_fraction)
 
 histepoch = historiessml()
@@ -34,12 +32,9 @@ mkpath(base_folder)
 cbepoch = CbAll(CUDA.reclaim, GC.gc, histepoch, save_progress, CUDA.reclaim, GC.gc)
 cbbatch = CbAll(CUDA.reclaim, GC.gc, histbatch, CUDA.reclaim, GC.gc)
 
-#BSON.@load "test/models/pretrainedmaskprogress2020-12-21T17:38:09.58.bson" m_cpu histepoch histbatch optimizer_w
-#pars = Flux.params(cpu(m_cpu))
-#m_cpu = nothing
+
 m = DARTSModel()
-#Flux.loadparams!(m, pars)
 m = gpu(m)
 CUDA.memory_status()
-Flux.@epochs 10 Standardtrain1st!(accuracy_batched, loss, m, train, optimizer_w, losses; cbepoch = cbepoch, cbbatch = cbbatch)
-Flux.@epochs 10 Maskedtrain1st!(accuracy_batched, loss, m, train, val, optimizer_w, losses; cbepoch = cbepoch, cbbatch = cbbatch)
+Flux.@epochs 10 Standardtrain1st!(accuracy_batched, loss, m, train, optimiser_w, losses; cbepoch = cbepoch, cbbatch = cbbatch)
+Flux.@epochs 10 Maskedtrain1st!(accuracy_batched, loss, m, train, val, optimiser_w, losses; cbepoch = cbepoch, cbbatch = cbbatch)

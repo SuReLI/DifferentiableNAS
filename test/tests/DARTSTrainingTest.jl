@@ -22,14 +22,14 @@ include(".../CIFAR10.jl")
         y_g = y |> gpu
         mean(onecold(m(x_g), 1:10) .== onecold(y_g, 1:10))
     end
-    optimizer = ADAM()
+    optimiser = ADAM()
     train, val = get_processed_data(splitr, batchsize)
     test = get_test_data(0.01)
 
     loss1 = loss(m, train[1][1] |> gpu, train[1][2] |> gpu)
     acc1 = accuracy(m, test...)
 
-    DARTStrain1st!(loss, m, train, val, optimizer; cb = evalcb)
+    DARTStrain1st!(loss, m, train, val, optimiser; cb = evalcb)
 
     loss2 = loss(m, train[1][1] |> gpu, train[1][2] |> gpu)
     acc2 = accuracy(m, test...)

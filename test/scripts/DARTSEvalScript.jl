@@ -26,8 +26,7 @@ end
 
 argparams = eval_params(batchsize = 16, test_batchsize = 16)
 
-optimizer_α = ADAM(3e-4,(0.9,0.999))
-optimizer_w = Nesterov(0.025,0.9) #change?
+optimiser = Optimiser(WeightDecay(3e-4),Momentum(0.025, 0.9))
 
 train, val = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction)
 test = get_test_data(argparams.test_fraction, argparams.test_batchsize)
@@ -49,5 +48,4 @@ BSON.@load trial_name normal_ reduce_
 cbepoch = CbAll(histepoch, save_progress)
 
 m = DARTSEvalAuxModel(normal_, reduce_, num_cells=20, channels=36) |> gpu
-optimizer = Nesterov(3e-4,0.9)
-Flux.@epochs 10 DARTSevaltrain1st!(loss, m, train, optimizer; cbepoch = cbepoch)
+Flux.@epochs 10 DARTSevaltrain1st!(loss, m, train, optimiser; cbepoch = cbepoch)

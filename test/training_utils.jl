@@ -65,8 +65,8 @@ end
 histories() = histories([],[],[],[])
 
 function (hist::histories)()
-    push!(hist.normal_αs_sm, copy(m.normal_αs) |> cpu)
-    push!(hist.reduce_αs_sm, copy(m.reduce_αs) |> cpu)
+    push!(hist.normal_αs, deepcopy(m.normal_αs) |> cpu)
+    push!(hist.reduce_αs, deepcopy(m.reduce_αs) |> cpu)
     #push!(hist.activations, m.activations |> cpu)
     #push!(hist.accuracies, accuracy_batched(m, val |> gpu))
 end
@@ -83,8 +83,8 @@ historiessm() = historiessm([],[],[],[])
 
 function (hist::historiessm)()
     @show losses
-    push!(hist.normal_αs_sm, softmax.(copy(m.normal_αs)) |> cpu)
-    push!(hist.reduce_αs_sm, softmax.(copy(m.reduce_αs)) |> cpu)
+    push!(hist.normal_αs_sm, softmax.(deepcopy(m.normal_αs)) |> cpu)
+    push!(hist.reduce_αs_sm, softmax.(deepcopy(m.reduce_αs)) |> cpu)
     #push!(hist.activations, copy(m.activations.currentacts) |> cpu)
     CUDA.reclaim()
     GC.gc()
@@ -103,12 +103,14 @@ end
 historiessml() = historiessml([],[],[],[],[],[])
 
 function (hist::historiessml)()
+    @show m.normal_αs[1]
     @show losses
-    push!(hist.normal_αs_sm, softmax.(copy(m.normal_αs)) |> cpu)
-    push!(hist.reduce_αs_sm, softmax.(copy(m.reduce_αs)) |> cpu)
+    push!(hist.normal_αs_sm, softmax.(deepcopy(m.normal_αs)) |> cpu)
+    push!(hist.reduce_αs_sm, softmax.(deepcopy(m.reduce_αs)) |> cpu)
     #push!(hist.activations, copy(m.activations.currentacts) |> cpu)
     push!(hist.train_losses, losses[1])
     push!(hist.val_losses, losses[2])
+    @show m.normal_αs[1]
     CUDA.reclaim()
     GC.gc()
 end

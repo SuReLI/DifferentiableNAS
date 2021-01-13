@@ -262,8 +262,8 @@ function (m::MixedOp)(
     αs::AbstractArray,
     acts::Union{Nothing,Dict} = nothing,
 )
-    αs = my_softmax(αs)
-    sum(αs[i] * m.ops[i](x, acts, m.cellid) for i = 1:length(αs))
+    as = my_softmax(copy(αs))
+    sum(as[i] * m.ops[i](x, acts, m.cellid) for i = 1:length(as))
 end
 
 Flux.@functor MixedOp
@@ -444,14 +444,16 @@ function maxk(a::AbstractArray, k::Int64)
     return collect(b)
 end
 
-function discretize(αs::AbstractArray, channels::Int64, reduce::Bool, steps::Int64)
+function discretize(αs::AbstractArray, channels::Int64, reduce::Bool, steps::Int64, disclude_1::Bool = true)
     ops = []
     opnames = []
     inputindices = []
     rows = 0
     for i = 3:steps+2 #TODO test this loop, make sure it's not none
-        for j = 1:i-1
-            αs[rows+j][1] = -Inf32
+        if disclude_1
+            for j = 1:i-1
+                αs[rows+j][1] = -Inf32
+            end
         end
         options = [findmax(αs[rows+j]) for j = 1:i-1]
         top2 = partialsortperm(options, 1:2, by = x -> x[1], rev = true)

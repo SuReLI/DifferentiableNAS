@@ -21,7 +21,6 @@ optimizer_α = ADAM(3e-4,(0.9,0.999))
 optimizer_w = Nesterov(0.025,0.9) #change?
 
 train, val = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction)
-@show (length(train), length(val))
 test = get_test_data(argparams.test_fraction)
 
 histepoch = historiessml()

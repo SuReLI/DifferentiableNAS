@@ -103,14 +103,12 @@ end
 historiessml() = historiessml([],[],[],[],[],[])
 
 function (hist::historiessml)()
-    @show m.normal_αs[1]
     @show losses
     push!(hist.normal_αs_sm, softmax.(deepcopy(m.normal_αs)) |> cpu)
     push!(hist.reduce_αs_sm, softmax.(deepcopy(m.reduce_αs)) |> cpu)
     #push!(hist.activations, copy(m.activations.currentacts) |> cpu)
     push!(hist.train_losses, losses[1])
     push!(hist.val_losses, losses[2])
-    @show m.normal_αs[1]
     CUDA.reclaim()
     GC.gc()
 end
@@ -127,8 +125,8 @@ function save_progress()
     m_cpu = m |> cpu
     normal = m_cpu.normal_αs
     reduce = m_cpu.reduce_αs
-    BSON.@save joinpath(base_folder, "model.bson") m_cpu argparams optimizer_α optimizer_w
-    BSON.@save joinpath(base_folder, "alphas.bson") normal reduce argparams optimizer_α optimizer_w
+    BSON.@save joinpath(base_folder, "model.bson") m_cpu argparams optimiser_α optimiser_w
+    BSON.@save joinpath(base_folder, "alphas.bson") normal reduce argparams optimiser_α optimiser_w
     BSON.@save joinpath(base_folder, "histepoch.bson") histepoch
     BSON.@save joinpath(base_folder, "histbatch.bson") histbatch
 end

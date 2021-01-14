@@ -36,6 +36,5 @@ cbbatch = CbAll(CUDA.reclaim, GC.gc, histbatch, CUDA.reclaim, GC.gc)
 
 m = DARTSModel()
 m = gpu(m)
-zs = 0*vcat(m.normal_αs, m.reduce_αs)
-us = 0*vcat(m.normal_αs, m.reduce_αs)
-Flux.@epochs 50 ADMMtrain1st!(loss, m, train, val, optimiser_w, optimiser_α, zs, us, 1e-3, losses; cbepoch = cbepoch, cbbatch = cbbatch)
+zu = ADMMaux(0*vcat(m.normal_αs, m.reduce_αs), 0*vcat(m.normal_αs, m.reduce_αs))
+Flux.@epochs 50 ADMMtrain1st!(loss, m, train, val, optimiser_w, optimiser_α, zu, 1e-3, losses; cbepoch = cbepoch, cbbatch = cbbatch)

@@ -1,4 +1,4 @@
-export ADMMtrain1st!, euclidmap, regterm
+export ADMMtrain1st!, euclidmap, regterm, ADMMaux
 
 using Flux
 using Flux: onehotbatch
@@ -19,6 +19,7 @@ function euclidmap(aus, cardinality)
             aus[i][j] = 0
         end
     end
+    #also discretize across 2,3,4,5 here?
     aus
 end
 
@@ -34,7 +35,14 @@ function regterm(m::DARTSModel, zs, us)
     out
 end
 
-function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zs, us, ρ=1e-3, losses=[0.0,0.0]; cbepoch = () -> (), cbbatch = () -> ())
+mutable struct ADMMaux
+    zs::AbstractArray
+    us::AbstractArray
+end
+
+function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, losses=[0.0,0.0]; cbepoch = () -> (), cbbatch = () -> ())
+    zs = zu.zs
+    us = zu.us
     w = all_ws_sansbn(model)
     α = all_αs(model)
     local train_loss
@@ -56,7 +64,7 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zs, us, ρ=1e-3, 
         foreach(CUDA.unsafe_free!, val_batch)
         Flux.Optimise.update!(opt_α, α, gsα)
         CUDA.reclaim()
-        if i%10 == 0
+        if i%1 == 0
             as = collect_αs(model)
             display(as)
             zs = euclidmap(as+us, 1)
@@ -67,4 +75,6 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zs, us, ρ=1e-3, 
         cbbatch()
     end
     cbepoch()
+    zu.zs = zs
+    zu.us = us
 end

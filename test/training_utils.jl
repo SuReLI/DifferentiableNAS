@@ -123,10 +123,10 @@ CbAll(cbs...) = CbAll(cbs)
 
 function save_progress()
     m_cpu = m |> cpu
-    normal = m_cpu.normal_αs
-    reduce = m_cpu.reduce_αs
+    normal_αs = m_cpu.normal_αs
+    reduce_αs = m_cpu.reduce_αs
     BSON.@save joinpath(base_folder, "model.bson") m_cpu argparams optimiser_α optimiser_w
-    BSON.@save joinpath(base_folder, "alphas.bson") normal reduce argparams optimiser_α optimiser_w
+    BSON.@save joinpath(base_folder, "alphas.bson") normal_αs reduce_αs
     BSON.@save joinpath(base_folder, "histepoch.bson") histepoch
     BSON.@save joinpath(base_folder, "histbatch.bson") histbatch
 end

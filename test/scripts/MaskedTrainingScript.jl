@@ -17,6 +17,7 @@ argparams = trial_params(val_split = 0.1, batchsize = 32)
 num_ops = length(PRIMITIVES)
 
 optimiser_w = Optimiser(WeightDecay(3e-4),Momentum(0.025, 0.9))
+optimiser_α = Optimiser(WeightDecay(1e-3),ADAM(3e-4,(0.5,0.999)))
 
 train, val = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction)
 test = get_test_data(argparams.test_fraction)

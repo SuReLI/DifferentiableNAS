@@ -37,6 +37,16 @@ function (hist::historiessml)()
 end
 histepoch = historiessml()
 
+function save_progress()
+    m_cpu = m |> cpu
+    normal_αs = m_cpu.normal_αs
+    reduce_αs = m_cpu.reduce_αs
+    BSON.@save joinpath(base_folder, "model.bson") m_cpu argparams optimiser
+    BSON.@save joinpath(base_folder, "histepoch.bson") histepoch
+    BSON.@save joinpath(base_folder, "histbatch.bson") histbatch
+end
+
+
 datesnow = Dates.now()
 base_folder = string("test/models/eval_", datesnow)
 mkpath(base_folder)

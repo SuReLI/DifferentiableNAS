@@ -132,7 +132,7 @@ function (m::AdaptiveMeanPool)(x)
 end
 
 PRIMITIVES = [
-    #"none",
+    "none",
     "max_pool_3x3",
     "avg_pool_3x3",
     "skip_connect",
@@ -445,6 +445,23 @@ function maxk(a::AbstractArray, k::Int64)
 end
 
 function discretize(αs::AbstractArray, channels::Int64, reduce::Bool, steps::Int64, disclude_1::Bool = true)
+    prim = [
+        "none",
+        "max_pool_3x3",
+        "avg_pool_3x3",
+        "skip_connect",
+        "sep_conv_3x3",
+        "sep_conv_5x5",
+        #"sep_conv_7x7",
+        "dil_conv_3x3",
+        "dil_conv_5x5",
+        #"conv_7x1_1x7"
+    ]
+
+    if length(αs[1]) == 7
+        prim = prim[2:8]
+        disclude_1 = false
+    end
     ops = []
     opnames = []
     inputindices = []
@@ -457,9 +474,9 @@ function discretize(αs::AbstractArray, channels::Int64, reduce::Bool, steps::In
         end
         options = [findmax(αs[rows+j]) for j = 1:i-1]
         top2 = partialsortperm(options, 1:2, by = x -> x[1], rev = true)
-        top2names = Tuple(PRIMITIVES[options[i][2]] for i in top2)
+        top2names = Tuple(prim[options[i][2]] for i in top2)
         top2ops = Tuple(
-            OPS[PRIMITIVES[options[i][2]]](channels, reduce && i < 3 ? 2 : 1, 1)
+            OPS[prim[options[i][2]]](channels, reduce && i < 3 ? 2 : 1, 1)
             for i in top2
         )
         push!(inputindices, top2)

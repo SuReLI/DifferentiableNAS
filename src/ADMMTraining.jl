@@ -15,7 +15,7 @@ include("DARTSModel.jl")
 function euclidmap(aus, cardinality)
     if cardinality == -1 #full DARTS discretization
         for i in 1:size(aus,1)
-            aus[i][1] = 0 #ensure we don't choose none
+            #aus[i][1] = 0 #ensure we don't choose none
             to_mask = sortperm(aus[i])[1:length(aus[i])-1]
             aus[i][to_mask] .= 0
         end

@@ -13,13 +13,29 @@ include("utils.jl")
 include("DARTSModel.jl")
 
 function euclidmap(aus, cardinality)
-    for i in 1:size(aus,1)
-        to_mask = sortperm(aus[i])[1:length(aus[i])-cardinality]
-        for j in to_mask
-            aus[i][j] = 0
+    if cardinality == -1 #full DARTS discretization
+        for i in 1:size(aus,1)
+            aus[i][1] = 0 #ensure we don't choose none
+            to_mask = sortperm(aus[i])[1:length(aus[i])-1]
+            aus[i][to_mask] .= 0
+        end
+        i = 1
+        for r in 1:4
+            maxes = maximum(aus[i:i+r][:], dims = 2)
+            keep_rows = sortperm(maxes, rev=true)[1:2]
+            for k in 1:r+1
+                if !(k in keep_rows)
+                    aus[i+k-1][:] .= 0
+                end
+            end
+            i += r+1
+        end
+    else
+        for i in 1:size(aus,1)
+            to_mask = sortperm(aus[i])[1:length(aus[i])-cardinality]
+            aus[i][to_mask] .= 0
         end
     end
-    #also discretize across 2,3,4,5 here?
     aus
 end
 
@@ -67,7 +83,7 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, loss
         if i%10 == 0
             as = collect_αs(model)
             display(as)
-            zs = euclidmap(as+us, 1)
+            zs = euclidmap(as+us, -1)
             display(zs)
             us += as - zs
             display(us)

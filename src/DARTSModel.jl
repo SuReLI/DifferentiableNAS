@@ -1,12 +1,12 @@
 export PRIMITIVES,
-    DARTSModel,
-    Cell,
-    MixedOp,
-    DARTSEvalModel,
-    EvalCell,
-    Activations,
-    discretize,
-    DARTSEvalAuxModel
+DARTSModel,
+Cell,
+MixedOp,
+DARTSEvalModel,
+EvalCell,
+Activations,
+discretize,
+DARTSEvalAuxModel
 
 using Flux
 using Base.Iterators
@@ -28,9 +28,19 @@ ReLUConvBN(channels_in, channels_out, kernel_size, stride, pad) =
 
 function FactorizedReduce(channels_in, channels_out, stride)
     odd =
-        Conv((1, 1), channels_in => channels_out ÷ stride, stride = (stride, stride), bias = false) |> gpu
+        Conv(
+            (1, 1),
+            channels_in => channels_out ÷ stride,
+            stride = (stride, stride),
+            bias = false,
+        ) |> gpu
     even =
-        Conv((1, 1), channels_in => channels_out ÷ stride, stride = (stride, stride), bias = false) |> gpu
+        Conv(
+            (1, 1),
+            channels_in => channels_out ÷ stride,
+            stride = (stride, stride),
+            bias = false,
+        ) |> gpu
 
     Chain(
         x -> relu.(x),
@@ -47,9 +57,15 @@ SepConv(channels_in, channels_out, kernel_size, stride, pad) =
             channels_in => channels_in,
             stride = (stride, stride),
             pad = (pad, pad),
-            bias = false
+            bias = false,
         ),
-        Conv((1, 1), channels_in => channels_in, stride = (1, 1), pad = (0, 0), bias = false),
+        Conv(
+            (1, 1),
+            channels_in => channels_in,
+            stride = (1, 1),
+            pad = (0, 0),
+            bias = false,
+        ),
         BatchNorm(channels_in),
         x -> relu.(x),
         DepthwiseConv(
@@ -57,9 +73,15 @@ SepConv(channels_in, channels_out, kernel_size, stride, pad) =
             channels_in => channels_in,
             pad = (pad, pad),
             stride = (1, 1),
-            bias = false
+            bias = false,
         ),
-        Conv((1, 1), channels_in => channels_out, stride = (1, 1), pad = (0, 0), bias = false),
+        Conv(
+            (1, 1),
+            channels_in => channels_out,
+            stride = (1, 1),
+            pad = (0, 0),
+            bias = false,
+        ),
         BatchNorm(channels_out),
     ) |> gpu
 
@@ -72,9 +94,15 @@ DilConv(channels_in, channels_out, kernel_size, stride, pad, dilation) =
             pad = (pad, pad),
             stride = (stride, stride),
             dilation = dilation,
-            bias = false
+            bias = false,
         ),
-        Conv(kernel_size, channels_in => channels_out, stride = (1, 1), pad = (pad, pad), bias = false),
+        Conv(
+            kernel_size,
+            channels_in => channels_out,
+            stride = (1, 1),
+            pad = (pad, pad),
+            bias = false,
+        ),
         BatchNorm(channels_out),
     ) |> gpu
 
@@ -86,13 +114,31 @@ SepConv_v(channels_in, channels_out, kernel_size, stride, pad) =
             channels_in => channels_in,
             stride = (stride, stride),
             pad = (pad, pad),
-            bias = false
+            bias = false,
         ),
-        Conv((1, 1), channels_in => channels_in, stride = (1, 1), pad = (0, 0), bias = false),
+        Conv(
+            (1, 1),
+            channels_in => channels_in,
+            stride = (1, 1),
+            pad = (0, 0),
+            bias = false,
+        ),
         BatchNorm(channels_in),
         x -> relu.(x),
-        Conv(kernel_size, channels_in => channels_in, pad = (pad, pad), stride = (1, 1), bias = false),
-        Conv((1, 1), channels_in => channels_out, stride = (1, 1), pad = (0, 0), bias = false),
+        Conv(
+            kernel_size,
+            channels_in => channels_in,
+            pad = (pad, pad),
+            stride = (1, 1),
+            bias = false,
+        ),
+        Conv(
+            (1, 1),
+            channels_in => channels_out,
+            stride = (1, 1),
+            pad = (0, 0),
+            bias = false,
+        ),
         BatchNorm(channels_out),
     ) |> gpu
 
@@ -105,9 +151,15 @@ DilConv_v(channels_in, channels_out, kernel_size, stride, pad, dilation) =
             pad = (pad * dilation, pad * dilation),
             stride = (stride, stride),
             dilation = dilation,
-            bias = false
+            bias = false,
         ),
-        Conv(kernel_size, channels_in => channels_out, stride = (1, 1), pad = (pad, pad), bias = false),
+        Conv(
+            kernel_size,
+            channels_in => channels_out,
+            stride = (1, 1),
+            pad = (pad, pad),
+            bias = false,
+        ),
         BatchNorm(channels_out),
     ) |> gpu
 
@@ -123,7 +175,8 @@ struct AdaptiveMeanPool{N}
     target_out::NTuple{N,Int}
 end
 
-AdaptiveMeanPool(target_out::NTuple{N,Integer}) where {N} = AdaptiveMeanPool(target_out)
+AdaptiveMeanPool(target_out::NTuple{N,Integer}) where {N} =
+    AdaptiveMeanPool(target_out)
 
 function (m::AdaptiveMeanPool)(x)
     w = size(x, 1) - m.target_out[1] + 1
@@ -149,10 +202,16 @@ OPS = Dict(
     "none" => (channels, stride, w) -> Chain(Zero(stride, 1)) |> gpu,
     "avg_pool_3x3" =>
         (channels, stride, w) ->
-            Chain(MeanPool((3, 3), stride = stride, pad = 1), BatchNorm(channels)) |> gpu,
+            Chain(
+                MeanPool((3, 3), stride = stride, pad = 1),
+                BatchNorm(channels),
+            ) |> gpu,
     "max_pool_3x3" =>
         (channels, stride, w) ->
-            Chain(MaxPool((3, 3), stride = stride, pad = 1), BatchNorm(channels)) |> gpu,
+            Chain(
+                MaxPool((3, 3), stride = stride, pad = 1),
+                BatchNorm(channels),
+            ) |> gpu,
     "skip_connect" =>
         (channels, stride, w) ->
             Chain(SkipConnect(channels, channels, stride, 1)) |> gpu,
@@ -175,45 +234,66 @@ OPS = Dict(
         (channels, stride, w) ->
             Chain(
                 x -> relu.(x),
-                Conv((1, 7), channels => channels, pad = (0, 3), stride = (1, stride), bias = false),
-                Conv((7, 1), channels => channels, pad = (3, 0), stride = (stride, 1), bias = false),
+                Conv(
+                    (1, 7),
+                    channels => channels,
+                    pad = (0, 3),
+                    stride = (1, stride),
+                    bias = false,
+                ),
+                Conv(
+                    (7, 1),
+                    channels => channels,
+                    pad = (3, 0),
+                    stride = (stride, 1),
+                    bias = false,
+                ),
                 BatchNorm(channels),
             ) |> gpu,
 )
 
-function my_softmax(xs; dims = 1)
-    softmax(xs, dims = dims)
+function my_softmax(xs::AbstractArray; dims = 1)
+    softmax!(similar(xs), xs, dims=dims)
 end
 
-Zygote.@adjoint function my_softmax(xs; dims = 1)
+Zygote.@adjoint function my_softmax(xs::AbstractArray; dims = 1)
     softmax(xs, dims = dims), Δ -> begin
         (∇softmax(Δ, xs, dims = dims),)
     end
 end
+
 
 struct OpActs
     name::String
     op::Any
 end
 
-function showlayer(x::AbstractArray, layer, opname::String, outs::Array{Array{Float32,3}})
+function showlayer(
+    x::AbstractArray,
+    layer,
+    opname::String,
+    outs::Array{Array{Float32,3}},
+)
     out = layer(x)
     Zygote.ignore() do
         if !(typeof(layer) <: Flux.BatchNorm) && !occursin("none", opname)
-            push!(outs, dropdims(mean(out, dims=(1,2,3)),dims=3) |> cpu)
+            push!(outs, dropdims(mean(out, dims = (1, 2, 3)), dims = 3) |> cpu)
         end
     end
     out
 end
 
 function (opwrap::OpActs)(xin::AbstractArray, acts::Dict, cellid::Int64)
-    outs = Array{Array{Float32,3}}(undef,0)
-    xout =
-        foldl((x, layer) -> showlayer(x, layer, opwrap.name, outs), opwrap.op, init = xin)
+    outs = Array{Array{Float32,3}}(undef, 0)
+    xout = foldl(
+        (x, layer) -> showlayer(x, layer, opwrap.name, outs),
+        opwrap.op,
+        init = xin,
+    )
     Zygote.ignore() do
         if length(outs) > 0
             if haskey(acts, opwrap.name)
-                acts[opwrap.name] = vcat(acts[opwrap.name],hcat(outs...))
+                acts[opwrap.name] = vcat(acts[opwrap.name], hcat(outs...))
             else
                 acts[opwrap.name] = hcat(outs...)
             end
@@ -229,7 +309,11 @@ struct Op
     op::Any
 end
 
-function (opwrap::Op)(xin::AbstractArray, acts::Union{Dict,Nothing}, cellid::Int64 = 0)
+function (opwrap::Op)(
+    xin::AbstractArray,
+    acts::Union{Dict,Nothing},
+    cellid::Int64 = 0,
+)
     opwrap.op(xin)
 end
 
@@ -241,7 +325,13 @@ struct MixedOp
     ops::AbstractArray
 end
 
-function MixedOp(cellid::Int64, name::String, channels::Int64, stride::Int64, track_acts::Bool = false)
+function MixedOp(
+    cellid::Int64,
+    name::String,
+    channels::Int64,
+    stride::Int64,
+    track_acts::Bool = false,
+)
     if track_acts
         op = OpActs
     else
@@ -253,7 +343,7 @@ function MixedOp(cellid::Int64, name::String, channels::Int64, stride::Int64, tr
         [
             op(string(name, "-", prim), OPS[prim](channels, stride, 1) |> gpu)
             for prim in PRIMITIVES
-        ]
+        ],
     ) |> gpu
 end
 
@@ -286,19 +376,27 @@ function Cell(
     steps::Int64,
     multiplier::Int64,
     cellid::Int64,
-    track_acts::Bool = false
+    track_acts::Bool = false,
 )
     if reduce_previous
         prelayer1 = FactorizedReduce(channels_before_last, channels, 2) |> gpu
     else
-        prelayer1 = ReLUConvBN(channels_before_last, channels, (1, 1), 1, 0) |> gpu
+        prelayer1 =
+            ReLUConvBN(channels_before_last, channels, (1, 1), 1, 0) |> gpu
     end
     prelayer2 = ReLUConvBN(channels_last, channels, (1, 1), 1, 0) |> gpu
     mixedops = []
     for i = 3:steps+2 #op output
         for j = 1:i-1 #op input
             reduce && j < 3 ? stride = 2 : stride = 1
-            mixedop = MixedOp(cellid, string(j, "-", i), channels, stride, track_acts) |> gpu
+            mixedop =
+                MixedOp(
+                    cellid,
+                    string(j, "-", i),
+                    channels,
+                    stride,
+                    track_acts,
+                ) |> gpu
             push!(mixedops, mixedop)
         end
     end
@@ -321,7 +419,8 @@ function (m::Cell)(
     offset = 0
     for step = 1:m.steps
         state = mapreduce(
-            (mixedop, α, previous_state) -> mixedop(previous_state, α, acts),
+            (mixedop, α, previous_state) ->
+                mixedop(previous_state, α, acts),
             +,
             m.mixedops[offset+1:offset+step+1],
             αs[offset+1:offset+step+1],
@@ -337,7 +436,7 @@ end
 Flux.@functor Cell
 
 mutable struct Activations
-    currentacts::Dict{String, Array{Float32,3}}
+    currentacts::Dict{String,Array{Float32,3}}
 end
 
 struct DARTSModel
@@ -358,7 +457,7 @@ function DARTSModel(;
     steps::Int64 = 4,
     mult::Int64 = 4,
     stem_mult::Int64 = 3,
-    track_acts::Bool = false
+    track_acts::Bool = false,
 )
     channels_current = channels * stem_mult
     stem =
@@ -388,7 +487,7 @@ function DARTSModel(;
                 steps,
                 mult,
                 i,
-                track_acts
+                track_acts,
             ) |> gpu
         push!(cells, cell)
 
@@ -402,8 +501,16 @@ function DARTSModel(;
     num_ops = length(PRIMITIVES)
     α_normal = [α_init(num_ops) for _ = 1:k]
     α_reduce = [α_init(num_ops) for _ = 1:k]
-    activations = Activations(Dict{String, Array{Float32,3}}())
-    DARTSModel(α_normal, α_reduce, stem, cells, global_pooling, classifier, activations)
+    activations = Activations(Dict{String,Array{Float32,3}}())
+    DARTSModel(
+        α_normal,
+        α_reduce,
+        stem,
+        cells,
+        global_pooling,
+        classifier,
+        activations,
+    )
 end
 
 function (m::DARTSModel)(x; αs::AbstractArray = [])
@@ -416,7 +523,7 @@ function (m::DARTSModel)(x; αs::AbstractArray = [])
     end
     s1 = m.stem(x)
     s2 = m.stem(x)
-    m.activations.currentacts = Dict{String, Array{Float32,3}}()
+    m.activations.currentacts = Dict{String,Array{Float32,3}}()
     for (i, cell) in enumerate(m.cells)
         cell.reduction ? αs = reduce_αs : αs = normal_αs
         new_state = cell(s1, s2, αs, m.activations.currentacts)
@@ -444,7 +551,13 @@ function maxk(a::AbstractArray, k::Int64)
     return collect(b)
 end
 
-function discretize(αs::AbstractArray, channels::Int64, reduce::Bool, steps::Int64, disclude_1::Bool = true)
+function discretize(
+    αs::AbstractArray,
+    channels::Int64,
+    reduce::Bool,
+    steps::Int64,
+    disclude_1::Bool = true,
+)
     prim = [
         "none",
         "max_pool_3x3",
@@ -600,7 +713,10 @@ function DARTSEvalModel(
     DARTSEvalModel(α_normal, α_reduce, stem, cells, global_pooling, classifier)
 end
 
-function (m::DARTSEvalModel)(x::AbstractArray, drop_prob::Float32 = Float32(0.0))
+function (m::DARTSEvalModel)(
+    x::AbstractArray,
+    drop_prob::Float32 = Float32(0.0),
+)
     s1 = m.stem(x)
     s2 = m.stem(x)
     for (i, cell) in enumerate(m.cells)

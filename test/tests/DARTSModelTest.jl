@@ -4,6 +4,10 @@ using CUDA
 using Distributions: Bernoulli
 include("../CIFAR10.jl")
 
+@testset "Softmax" begin
+
+end
+
 @testset "DARTS MixedOp" begin
     steps = 4
     k = floor(Int, steps^2/2+3*steps/2)
@@ -39,7 +43,6 @@ end
     masked_αs = [2e-3*(rand(num_ops).-0.5).*rand(Bernoulli(),num_ops) |> f32 |> gpu  for _ in 1:k]
     m = DARTSModel(track_acts = true) |> gpu
     @test length(Flux.params(m).order) > 1
-    @test length(all_αs(m).order) + length(all_ws(m).order) == length(Flux.params(m).order)
     @test length(Flux.params(m.cells).order) > 1
     test_image = rand(Float32, 32, 32, 3, 1) |> gpu
     grad = gradient(x->sum(m(x)), test_image)

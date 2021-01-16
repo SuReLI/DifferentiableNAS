@@ -26,9 +26,7 @@ histepoch = historiessml()
 histbatch = historiessml()
 losses = [0.0, 0.0]
 
-datesnow = Dates.now()
-base_folder = string("test/models/masked_", datesnow)
-mkpath(base_folder)
+base_folder = prepare_folder("masked")
 
 cbepoch = CbAll(CUDA.reclaim, GC.gc, histepoch, save_progress, CUDA.reclaim, GC.gc)
 cbbatch = CbAll(CUDA.reclaim, GC.gc, histbatch, CUDA.reclaim, GC.gc)

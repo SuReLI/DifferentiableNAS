@@ -121,6 +121,17 @@ CbAll(cbs...) = CbAll(cbs)
 
 (cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
 
+function prepare_folder(algo)
+    if "SLURM_JOB_ID" in keys(ENV)
+        uniqueid = ENV["SLURM_JOB_ID"]
+    else
+        uniqueid = Dates.now()
+    end
+    base_folder = string("test/models/", algo, "_", uniqueid)
+    mkpath(base_folder)
+    base_folder
+end
+
 function save_progress()
     m_cpu = m |> cpu
     normal_αs = m_cpu.normal_αs

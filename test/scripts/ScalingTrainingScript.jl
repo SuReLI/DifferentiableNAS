@@ -27,9 +27,7 @@ histepoch = historiessml()
 histbatch = historiessml()
 losses = [0.0, 0.0]
 
-datesnow = Dates.now()
-base_folder = string("test/models/scaling_", datesnow)
-mkpath(base_folder)
+base_folder = prepare_folder("scaling")
 
 cbepoch = CbAll(CUDA.reclaim, histepoch, save_progress, CUDA.reclaim)
 cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)

@@ -56,13 +56,14 @@ mutable struct ADMMaux
     us::AbstractArray
 end
 
-function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, losses=[0.0,0.0]; cbepoch = () -> (), cbbatch = () -> ())
+function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, losses=[0.0,0.0], epoch = 1; cbepoch = () -> (), cbbatch = () -> ())
     zs = zu.zs
     us = zu.us
     w = all_ws_sansbn(model)
     α = all_αs(model)
     local train_loss
     local val_loss
+    admmupdate = length(train)÷epoch
     for (i, train_batch, val_batch) in zip(1:length(train), CuIterator(train), CuIterator(val))
         gsw = gradient(w) do
             train_loss = loss(model, train_batch...)
@@ -80,7 +81,7 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, loss
         foreach(CUDA.unsafe_free!, val_batch)
         Flux.Optimise.update!(opt_α, α, gsα)
         CUDA.reclaim()
-        if i%10 == 0
+        if i%admmupdate == 0
             as = collect_αs(model)
             display(as)
             zs = euclidmap(as+us, -1)

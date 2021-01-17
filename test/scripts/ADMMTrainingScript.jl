@@ -13,7 +13,7 @@ include("../training_utils.jl")
 @nograd onehotbatch
 
 
-argparams = trial_params(batchsize = 32)
+argparams = trial_params(batchsize = 32, trainval_fraction = 0.02)
 
 num_ops = length(PRIMITIVES)
 
@@ -32,7 +32,9 @@ base_folder = prepare_folder("admm")
 cbepoch = CbAll(CUDA.reclaim, GC.gc, histepoch, save_progress, CUDA.reclaim, GC.gc)
 cbbatch = CbAll(CUDA.reclaim, GC.gc, histbatch, CUDA.reclaim, GC.gc)
 
-m = DARTSModel()
-m = gpu(m)
+m = DARTSModel(num_cells = 4, channels = 4) |> gpu
 zu = ADMMaux(0*vcat(m.normal_αs, m.reduce_αs), 0*vcat(m.normal_αs, m.reduce_αs))
-Flux.@epochs 50 ADMMtrain1st!(loss, m, train, val, optimiser_w, optimiser_α, zu, 1e-3, losses; cbepoch = cbepoch, cbbatch = cbbatch)
+for epoch in 1:argparams.epochs
+    @show epoch
+    ADMMtrain1st!(loss, m, train, val, optimiser_w, optimiser_α, zu, 3e-3, losses, epoch; cbepoch = cbepoch, cbbatch = cbbatch)
+end

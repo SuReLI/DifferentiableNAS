@@ -13,9 +13,9 @@ include("../CIFAR10.jl")
 include("../training_utils.jl")
 
 
-argparams = trial_params(batchsize = 32)
+argparams = trial_params()
 
-m = DARTSModel() |> gpu
+m = DARTSModel(num_cells = argparams.num_cells, channels = argparams.channels) |> gpu
 
 optimiser_α = Optimiser(WeightDecay(1e-3),ADAM(3e-4,(0.5,0.999)))
 optimiser_w = Optimiser(WeightDecay(3e-4),Momentum(0.025, 0.9))
@@ -32,4 +32,7 @@ base_folder = prepare_folder("scaling")
 cbepoch = CbAll(CUDA.reclaim, histepoch, save_progress, CUDA.reclaim)
 cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)
 
-Flux.@epochs 50 Scalingtrain1st!(loss, m, train, val, optimiser_α, optimiser_w, 0.1, losses)
+for epoch in 1:argparams.epochs
+    @show epoch
+    Scalingtrain1st!(loss, m, train, val, optimiser_α, optimiser_w, 0.1, losses)
+end

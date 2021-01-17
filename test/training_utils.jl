@@ -11,13 +11,33 @@ using Zygote
 include("CIFAR10.jl")
 @nograd onehotbatch
 
+gpumem = CUDA.totalmem(collect(CUDA.devices())[1])/(1024^3)
+if gpumem < 2.0
+    batchsize_ = 32
+    num_cells_ = 4
+    channels_ = 4
+    trainval_fraction_ = 0.02
+elseif gpumem < 12.0
+    batchsize_ = 32
+    num_cells_ = 8
+    channels_ = 16
+    trainval_fraction_ = 1.0
+else
+    batchsize_ = 124
+    num_cells_ = 8
+    channels_ = 16
+    trainval_fraction_ = 1.0
+end
+
 @with_kw struct trial_params
     epochs::Int = 50
-    batchsize::Int = 64
+    batchsize::Int = batchsize_
     throttle_::Int = 20
     val_split::Float32 = 0.5
-    trainval_fraction::Float32 = 1.0
+    trainval_fraction::Float32 = trainval_fraction_
     test_fraction::Float32 = 1.0
+    num_cells::Int = num_cells_
+    channels::Int = channels_
 end
 
 function loss(m, x, y)

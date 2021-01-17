@@ -64,6 +64,10 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, loss
     local train_loss
     local val_loss
     admmupdate = length(train)÷epoch
+    disc = length(zs[1])-epoch÷3 #hyperparam
+    if disc > 1
+        disc = -1
+    end
     for (i, train_batch, val_batch) in zip(1:length(train), CuIterator(train), CuIterator(val))
         gsw = gradient(w) do
             train_loss = loss(model, train_batch...)
@@ -84,7 +88,7 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, loss
         if i%admmupdate == 0
             as = collect_αs(model)
             display(as)
-            zs = euclidmap(as+us, -1)
+            zs = euclidmap(as+us, disc)
             display(zs)
             us += as - zs
             display(us)

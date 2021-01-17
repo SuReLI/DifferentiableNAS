@@ -51,7 +51,7 @@ if "SLURM_JOB_ID" in keys(ENV)
 else
     uniqueid = Dates.now()
 end
-base_folder = string(trial_folder, "eval_", uniqueid)
+base_folder = string(trial_folder, "/eval_", uniqueid)
 mkpath(base_folder)
 
 BSON.@load string(trial_folder, "/histepoch.bson") histepoch
@@ -62,4 +62,7 @@ histeval = historiessml()
 cbepoch = CbAll(histeval, save_progress)
 
 m = DARTSEvalAuxModel(normal_[length(normal_)], reduce_[length(reduce_)], num_cells=20, channels=36) |> gpu
-Flux.@epochs 10 DARTSevaltrain1st!(loss, m, train, optimiser; cbepoch = cbepoch)
+for epoch in 1:argparams.epochs
+    @show epoch
+    DARTSevaltrain1st!(loss, m, train, optimiser; cbepoch = cbepoch)
+end

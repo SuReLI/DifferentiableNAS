@@ -12,7 +12,7 @@ include("../CIFAR10.jl")
 include("../training_utils.jl")
 @nograd onehotbatch
 
-argparams = trial_params(val_split = 0.1, batchsize = 32)
+argparams = trial_params(val_split = 0.1)
 
 num_ops = length(PRIMITIVES)
 
@@ -32,8 +32,13 @@ cbepoch = CbAll(CUDA.reclaim, GC.gc, histepoch, save_progress, CUDA.reclaim, GC.
 cbbatch = CbAll(CUDA.reclaim, GC.gc, histbatch, CUDA.reclaim, GC.gc)
 
 
-m = DARTSModel()
-m = gpu(m)
+m = DARTSModel(num_cells = argparams.num_cells, channels = argparams.channels) |> gpu
 CUDA.memory_status()
-Flux.@epochs 10 Standardtrain1st!(accuracy_batched, loss, m, train, optimiser_w, losses; cbepoch = cbepoch, cbbatch = cbbatch)
-Flux.@epochs 10 Maskedtrain1st!(accuracy_batched, loss, m, train, val, optimiser_w, losses; cbepoch = cbepoch, cbbatch = cbbatch)
+for epoch in 1:10
+    @show epoch
+    Standardtrain1st!(accuracy_batched, loss, m, train, optimiser_w, losses; cbepoch = cbepoch, cbbatch = cbbatch)
+end
+for epoch in 11:argparams.epochs
+    @show epoch
+    Maskedtrain1st!(accuracy_batched, loss, m, train, val, optimiser_w, losses; cbepoch = cbepoch, cbbatch = cbbatch)
+end

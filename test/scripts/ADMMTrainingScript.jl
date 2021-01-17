@@ -12,8 +12,7 @@ include("../CIFAR10.jl")
 include("../training_utils.jl")
 @nograd onehotbatch
 
-
-argparams = trial_params(batchsize = 32, trainval_fraction = 0.02)
+argparams = trial_params()
 
 num_ops = length(PRIMITIVES)
 
@@ -32,7 +31,7 @@ base_folder = prepare_folder("admm")
 cbepoch = CbAll(CUDA.reclaim, GC.gc, histepoch, save_progress, CUDA.reclaim, GC.gc)
 cbbatch = CbAll(CUDA.reclaim, GC.gc, histbatch, CUDA.reclaim, GC.gc)
 
-m = DARTSModel(num_cells = 4, channels = 4) |> gpu
+m = DARTSModel(num_cells = argparams.num_cells, channels = argparams.channels) |> gpu
 zu = ADMMaux(0*vcat(m.normal_αs, m.reduce_αs), 0*vcat(m.normal_αs, m.reduce_αs))
 for epoch in 1:argparams.epochs
     @show epoch

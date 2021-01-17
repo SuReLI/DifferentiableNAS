@@ -64,7 +64,7 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, loss
     local train_loss
     local val_loss
     @show admmupdate = length(train)÷epoch
-    @show disc = length(zs[1])-epoch÷3 #hyperparam
+    @show disc = length(zs[1])-epoch÷3-1 #hyperparam
     if disc < 1
         disc = -1
     end

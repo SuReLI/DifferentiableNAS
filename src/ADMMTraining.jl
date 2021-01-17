@@ -40,7 +40,11 @@ function euclidmap(aus, cardinality)
 end
 
 function collect_αs(model)
-    vcat([exp.(n) for n in model.normal_αs], [exp.(n) for n in model.reduce_αs])
+    if typeof(model) <: DARTSModelBN
+        vcat(model.normal_αs, model.reduce_αs)
+    else
+        vcat([exp.(n) for n in model.normal_αs], [exp.(n) for n in model.reduce_αs])
+    end
 end
 function regterm(m, zs, us)
     as = collect_αs(m)

@@ -25,9 +25,9 @@ function all_params(submodels)
     return ps
 end
 
-all_αs(model::DARTSModel) = Flux.params([model.normal_αs, model.reduce_αs])
+all_αs(model) = Flux.params([model.normal_αs, model.reduce_αs])
 
-function all_ws_sansbn(model::DARTSModel) #without batchnorm params
+function all_ws_sansbn(model) #without batchnorm params
     all_w = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
     for (i,cell) in enumerate(model.cells)
         for (j,mixedop) in enumerate(cell.mixedops)

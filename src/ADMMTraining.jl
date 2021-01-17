@@ -42,7 +42,7 @@ end
 function collect_αs(model)
     vcat([exp.(n) for n in model.normal_αs], [exp.(n) for n in model.reduce_αs])
 end
-function regterm(m::DARTSModel, zs, us)
+function regterm(m, zs, us)
     as = collect_αs(m)
     out = 0.0
     for (a, z, u) in zip(as, zs, us)

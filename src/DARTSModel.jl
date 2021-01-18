@@ -34,6 +34,7 @@ function FactorizedReduce(channels_in, channels_out, stride)
             channels_in => channels_out ÷ stride,
             stride = (stride, stride),
             bias = false,
+            pad = (0, 0, 1, 1),
         ) |> gpu
     even =
         Conv(
@@ -41,11 +42,12 @@ function FactorizedReduce(channels_in, channels_out, stride)
             channels_in => channels_out ÷ stride,
             stride = (stride, stride),
             bias = false,
+            pad = (1, 1, 0, 0),
         ) |> gpu
 
     Chain(
         x -> relu.(x),
-        x -> cat(odd(x), even(x[2:end, 2:end, :, :]), dims = 3),
+        x -> cat(odd(x), even(x), dims = 3),
         BatchNorm(channels_out),
     ) |> gpu
 end

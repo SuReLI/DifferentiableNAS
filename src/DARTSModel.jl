@@ -203,7 +203,7 @@ PRIMITIVES = [
 
 #TODO: change to NamedTuple
 OPS = Dict(
-    "none" => (channels, stride, w) -> Chain(Zero(stride, 1)) |> gpu,
+    "none" => (channels, stride, w) -> Chain(Zero(stride, stride)) |> gpu,
     "avg_pool_3x3" =>
         (channels, stride, w) ->
             Chain(

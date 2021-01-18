@@ -39,12 +39,12 @@ function euclidmap(aus, cardinality)
     aus
 end
 
-function collect_αs(model)
-    if typeof(model) <: DARTSModelBN
-        vcat(model.normal_αs, model.reduce_αs)
-    else
-        vcat([exp.(n) for n in model.normal_αs], [exp.(n) for n in model.reduce_αs])
-    end
+function collect_αs(model::DARTSModel)
+    vcat([exp.(n) for n in model.normal_αs], [exp.(n) for n in model.reduce_αs])
+end
+
+function collect_αs(model::DARTSModelBN)
+    vcat(model.normal_αs, model.reduce_αs)
 end
 function regterm(m, zs, us)
     as = collect_αs(m)
@@ -67,11 +67,13 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, loss
     α = all_αs(model)
     local train_loss
     local val_loss
-    @show admmupdate = length(train)÷epoch
-    @show disc = length(zs[1])-epoch÷3-1 #hyperparam
+    admmupdate = length(train)÷epoch
+    @show admmupdate
+    disc = length(zs[1])-epoch÷3-1 #hyperparam
     if disc < 1
         disc = -1
     end
+    @show disc
     for (i, train_batch, val_batch) in zip(1:length(train), CuIterator(train), CuIterator(val))
         gsw = gradient(w) do
             train_loss = loss(model, train_batch...)

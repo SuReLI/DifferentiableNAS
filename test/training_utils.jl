@@ -1,4 +1,3 @@
-using DifferentiableNAS
 using Flux
 using Flux: throttle, logitcrossentropy, onecold, onehotbatch
 using StatsBase: mean

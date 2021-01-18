@@ -166,7 +166,8 @@ DilConv_v(channels_in, channels_out, kernel_size, stride, pad, dilation) =
 
 
 Identity(stride, pad) = x -> x |> gpu
-Zero(stride, pad) = x -> x[1:stride:end, 1:stride:end, :, :] * 0 |> gpu
+#Zero(stride, pad) = x -> x[1:stride:end, 1:stride:end, :, :] * 0 |> gpu
+Zero(stride, pad) = Chain(MeanPool((1, 1), stride = stride, pad = (pad,pad)), x -> 0*x)
 
 SkipConnect(channels_in, channels_out, stride, pad) =
     stride == 1 ? Identity(stride, pad) |> gpu :

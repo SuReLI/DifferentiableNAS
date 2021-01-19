@@ -22,7 +22,7 @@ elseif gpumem < 12.0
     channels_ = 16
     trainval_fraction_ = 1.0
 else
-    batchsize_ = 124
+    batchsize_ = 128
     num_cells_ = 8
     channels_ = 16
     trainval_fraction_ = 1.0

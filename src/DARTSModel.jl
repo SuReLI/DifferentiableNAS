@@ -45,7 +45,7 @@ function FactorizedReduce(channels_in, channels_out, stride)
 
     Chain(
         x -> relu.(x),
-        x -> cat(odd(x), even(x[2:end, 2:end, :, :]), dims = 3),
+        x -> cat(odd(x), even(x[2:end, 2:end, :, :]), dims = 3), #TODO get rid of indexing
         BatchNorm(channels_out),
     ) |> gpu
 end
@@ -167,7 +167,7 @@ DilConv_v(channels_in, channels_out, kernel_size, stride, pad, dilation) =
 
 Identity(stride, pad) = x -> x |> gpu
 #Zero(stride, pad) = x -> x[1:stride:end, 1:stride:end, :, :] * 0 |> gpu
-Zero(stride, pad) = Chain(MeanPool((1, 1), stride = stride, pad = (pad,pad)), x -> 0*x)
+Zero(stride, pad) = Chain(MeanPool((1, 1), stride = stride), x -> 0*x)
 
 SkipConnect(channels_in, channels_out, stride, pad) =
     stride == 1 ? Identity(stride, pad) |> gpu :
@@ -201,7 +201,7 @@ PRIMITIVES = [
 
 #TODO: change to NamedTuple
 OPS = Dict(
-    "none" => (channels, stride, w) -> Chain(Zero(stride, stride)) |> gpu,
+    "none" => (channels, stride, w) -> Chain(Zero(stride)) |> gpu,
     "avg_pool_3x3" =>
         (channels, stride, w) ->
             Chain(
@@ -575,7 +575,7 @@ function (m::MixedOpBN)(
     αs::AbstractArray,
     acts::Union{Nothing,Dict} = nothing,
 )
-    m.batchnorm(sum(αs[i] * m.ops[i](x, acts, m.cellid) for i = 1:length(αs)))
+    m.batchnorm(sum(αs[i] * m.ops[i](x, acts, m.cellid) for i = 1:length(αs) if αs[i] > 0))
 end
 
 Flux.@functor MixedOpBN

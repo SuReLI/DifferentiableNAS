@@ -7,7 +7,6 @@ using Distributions
 using BSON
 using Dates
 using Zygote
-include("CIFAR10.jl")
 @nograd onehotbatch
 
 gpumem = CUDA.totalmem(collect(CUDA.devices())[1])/(1024^3)

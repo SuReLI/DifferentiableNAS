@@ -793,8 +793,7 @@ function (m::MixedOpSig)(
     αs::AbstractArray,
     acts::Union{Nothing,Dict} = nothing,
 )
-    #m.batchnorm(sum(sigmoid(αs[i]) * m.ops[i](x, acts, m.cellid) for i = 1:length(αs)))
-    m.batchnorm(mapreduce((f, a) -> sigmoid(a)*f(x, acts, m.cellid), +, m.ops))
+    m.batchnorm(sum(sigmoid(αs[i]) * m.ops[i](x, acts, m.cellid) for i = 1:length(αs)))
 end
 
 Flux.@functor MixedOpSig
@@ -823,9 +822,9 @@ function CellSig(
         prelayer1 = FactorizedReduce(channels_before_last, channels, 2) |> gpu
     else
         prelayer1 =
-            ReLUConvSig(channels_before_last, channels, (1, 1), 1, 0) |> gpu
+            ReLUConvBN(channels_before_last, channels, (1, 1), 1, 0) |> gpu
     end
-    prelayer2 = ReLUConvSig(channels_last, channels, (1, 1), 1, 0) |> gpu
+    prelayer2 = ReLUConvBN(channels_last, channels, (1, 1), 1, 0) |> gpu
     mixedops = []
     for i = 3:steps+2 #op output
         for j = 1:i-1 #op input

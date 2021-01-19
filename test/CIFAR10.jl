@@ -37,9 +37,9 @@ function get_processed_data(splitr = 0.5, batchsize = 64, mini = 1.0, val_batchs
 	order = shuffle(1:total_img)
     X = train_x[:,:,:,order]
 	y = train_y[order]
-	@show (mean(X[:,:,:,1], dims = (1,2)), std(X[:,:,:,1], dims = (1,2)))
+	#@show (mean(X[:,:,:,1], dims = (1,2)), std(X[:,:,:,1], dims = (1,2)))
     imgs = [(X[:,:,:,i].-mean_im)./std_im for i in 1:total_img]
-	@show (mean(imgs[1], dims = (1,2)), std(imgs[1], dims = (1,2)))
+	#@show (mean(imgs[1], dims = (1,2)), std(imgs[1], dims = (1,2)))
     labels = Matrix(onehotbatch([y[i] for i in 1:total_img],0:9))
     train_pop = Int(floor((1-splitr)* total_img))
     train = [(cat(imgs[i]..., dims = 4), labels[:,i]) for i in partition(1:train_pop, batchsize)]

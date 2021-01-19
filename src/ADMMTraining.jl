@@ -46,6 +46,11 @@ end
 function collect_αs(model::DARTSModelBN)
     vcat(model.normal_αs, model.reduce_αs)
 end
+
+function collect_αs(model::DARTSModelSig)
+    vcat([sigmoid.(n) for n in model.normal_αs], [sigmoid.(n) for n in model.reduce_αs])
+end
+
 function regterm(m, zs, us)
     as = collect_αs(m)
     out = 0.0

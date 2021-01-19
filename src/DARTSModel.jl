@@ -7,7 +7,8 @@ EvalCell,
 Activations,
 discretize,
 DARTSEvalAuxModel,
-DARTSModelBN
+DARTSModelBN,
+DARTSModelSig
 
 using Flux
 using Base.Iterators
@@ -755,6 +756,223 @@ end
 
 Flux.@functor DARTSModelBN
 
+
+
+struct MixedOpSig
+    cellid::Int64
+    name::String
+    ops::AbstractArray
+    batchnorm::BatchNorm
+end
+
+function MixedOpSig(
+    cellid::Int64,
+    name::String,
+    channels::Int64,
+    stride::Int64,
+    track_acts::Bool = false,
+)
+    if track_acts
+        op = OpActs
+    else
+        op = Op
+    end
+    MixedOpSig(
+        cellid,
+        name,
+        [
+            op(string(name, "-", prim), OPS[prim](channels, stride, 1) |> gpu)
+            for prim in PRIMITIVES
+        ],
+        BatchNorm(channels)
+    ) |> gpu
+end
+
+function (m::MixedOpSig)(
+    x::AbstractArray,
+    αs::AbstractArray,
+    acts::Union{Nothing,Dict} = nothing,
+)
+    #m.batchnorm(sum(sigmoid(αs[i]) * m.ops[i](x, acts, m.cellid) for i = 1:length(αs)))
+    m.batchnorm(mapreduce((f, a) -> sigmoid(a)*f(x, acts, m.cellid), +, m.ops))
+end
+
+Flux.@functor MixedOpSig
+
+struct CellSig
+    steps::Int64
+    reduction::Bool
+    multiplier::Int64
+    prelayer1::Chain
+    prelayer2::Chain
+    mixedops::AbstractArray
+end
+
+function CellSig(
+    channels_before_last::Int64,
+    channels_last::Int64,
+    channels::Int64,
+    reduce::Bool,
+    reduce_previous::Bool,
+    steps::Int64,
+    multiplier::Int64,
+    cellid::Int64,
+    track_acts::Bool = false,
+)
+    if reduce_previous
+        prelayer1 = FactorizedReduce(channels_before_last, channels, 2) |> gpu
+    else
+        prelayer1 =
+            ReLUConvSig(channels_before_last, channels, (1, 1), 1, 0) |> gpu
+    end
+    prelayer2 = ReLUConvSig(channels_last, channels, (1, 1), 1, 0) |> gpu
+    mixedops = []
+    for i = 3:steps+2 #op output
+        for j = 1:i-1 #op input
+            reduce && j < 3 ? stride = 2 : stride = 1
+            mixedop =
+                MixedOpSig(
+                    cellid,
+                    string(j, "-", i),
+                    channels,
+                    stride,
+                    track_acts,
+                ) |> gpu
+            push!(mixedops, mixedop)
+        end
+    end
+    CellSig(steps, reduce, multiplier, prelayer1, prelayer2, mixedops) |> gpu
+end
+
+function (m::CellSig)(
+    x1::AbstractArray,
+    x2::AbstractArray,
+    αs::AbstractArray,
+    acts::Union{Nothing,Dict} = nothing,
+)
+    state1 = m.prelayer1(x1)
+    state2 = m.prelayer2(x2)
+
+    states = Zygote.Buffer([state1], m.steps + 2)
+
+    states[1] = state1
+    states[2] = state2
+    offset = 0
+    for step = 1:m.steps
+        state = mapreduce(
+            (mixedop, α, previous_state) ->
+                mixedop(previous_state, α, acts),
+            +,
+            m.mixedops[offset+1:offset+step+1],
+            αs[offset+1:offset+step+1],
+            states,
+        )
+        offset += step + 1
+        states[step+2] = state
+    end
+    states_ = copy(states)
+    cat(states_[m.steps+2-m.multiplier+1:m.steps+2]..., dims = 3)
+end
+
+Flux.@functor CellSig
+
+
+struct DARTSModelSig
+    normal_αs::AbstractArray
+    reduce_αs::AbstractArray
+    stem::Chain
+    cells::AbstractArray
+    global_pooling::AdaptiveMeanPool
+    classifier::Dense
+    activations::Activations
+end
+
+function DARTSModelSig(;
+    α_init = (num_ops -> 2e-3 * (rand(num_ops) .- 0.5) |> f32),
+    num_classes::Int64 = 10,
+    num_cells::Int64 = 8,
+    channels::Int64 = 16,
+    steps::Int64 = 4,
+    mult::Int64 = 4,
+    stem_mult::Int64 = 3,
+    track_acts::Bool = false,
+)
+    channels_current = channels * stem_mult
+    stem =
+        Chain(
+            Conv((3, 3), 3 => channels_current, pad = (1, 1), bias = false),
+            BatchNorm(channels_current),
+        ) |> gpu
+    channels_before_last = channels_current
+    channels_last = channels_current
+    channels_current = channels
+    reduce_previous = false
+    cells = []
+    for i = 1:num_cells
+        if i == num_cells ÷ 3 + 1 || i == 2 * num_cells ÷ 3 + 1
+            channels_current = channels_current * 2
+            reduce = true
+        else
+            reduce = false
+        end
+        cell =
+            CellSig(
+                channels_before_last,
+                channels_last,
+                channels_current,
+                reduce,
+                reduce_previous,
+                steps,
+                mult,
+                i,
+                track_acts,
+            ) |> gpu
+        push!(cells, cell)
+
+        reduce_previous = reduce
+        channels_before_last = channels_last
+        channels_last = mult * channels_current
+    end
+    global_pooling = AdaptiveMeanPool((1, 1)) |> gpu
+    classifier = Dense(channels_last, num_classes) |> gpu
+    k = floor(Int, steps^2 / 2 + 3 * steps / 2)
+    num_ops = length(PRIMITIVES)
+    α_normal = [α_init(num_ops) for _ = 1:k]
+    α_reduce = [α_init(num_ops) for _ = 1:k]
+    activations = Activations(Dict{String,Array{Float32,3}}())
+    DARTSModelSig(
+        α_normal,
+        α_reduce,
+        stem,
+        cells,
+        global_pooling,
+        classifier,
+        activations,
+    )
+end
+
+function (m::DARTSModelSig)(x; αs::AbstractArray = [])
+    if length(αs) > 0
+        normal_αs = αs[1]
+        reduce_αs = αs[2]
+    else
+        normal_αs = m.normal_αs
+        reduce_αs = m.reduce_αs
+    end
+    s1 = m.stem(x)
+    s2 = m.stem(x)
+    m.activations.currentacts = Dict{String,Array{Float32,3}}()
+    for (i, cell) in enumerate(m.cells)
+        cell.reduction ? αs = reduce_αs : αs = normal_αs
+        new_state = cell(s1, s2, αs, m.activations.currentacts)
+        s1 = s2
+        s2 = new_state
+    end
+    out = m.global_pooling(s2)
+    m.classifier(squeeze(out))
+end
+
+Flux.@functor DARTSModelSig
 
 
 

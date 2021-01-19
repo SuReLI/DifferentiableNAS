@@ -16,7 +16,18 @@ argparams = trial_params()
 
 num_ops = length(PRIMITIVES)
 
-m = DARTSModel(num_cells = argparams.num_cells, channels = argparams.channels) |> gpu
+m = DARTSModelBN(num_cells = argparams.num_cells, channels = argparams.channels) |> gpu
+
+function (hist::historiessml)()
+    @show losses
+    push!(hist.normal_αs_sm, m.normal_αs |> cpu)
+    push!(hist.reduce_αs_sm, m.reduce_αs |> cpu)
+    #push!(hist.activations, copy(m.activations.currentacts) |> cpu)
+    push!(hist.train_losses, losses[1])
+    push!(hist.val_losses, losses[2])
+    CUDA.reclaim()
+    GC.gc()
+end
 
 optimiser_α = Optimiser(WeightDecay(1e-3),ADAM(3e-4,(0.5,0.999)))
 optimiser_w = Optimiser(WeightDecay(3e-4),Momentum(0.025, 0.9))

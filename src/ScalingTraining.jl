@@ -1,4 +1,4 @@
-export Scalingtrain1st!, scalingupdate, collectscales
+export Scalingtrain1st!
 
 using Flux
 using Flux: onehotbatch

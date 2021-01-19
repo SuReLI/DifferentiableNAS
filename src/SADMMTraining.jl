@@ -1,4 +1,4 @@
-export ScalingADMMtrain1st!, scalingparams, collectscales
+export ScalingADMMtrain1st!
 
 using Flux
 using Flux: onehotbatch

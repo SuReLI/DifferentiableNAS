@@ -5,8 +5,8 @@ using Base.Iterators: partition
 using Random
 using Statistics
 
-CIFAR_MEAN = [0.47095686, 0.46275508, 0.42994085]
-CIFAR_STD = [0.24525039, 0.24154642, 0.25916523]
+CIFAR_MEAN = [0.47095686, 0.46275508, 0.42994085] |> f32
+CIFAR_STD = [0.24525039, 0.24154642, 0.25916523] |> f32
 
 function get_test_data(get_proportion = 1.0, batchsize = 0)
     # Fetch the test data from Metalhead and get it into proper shape.

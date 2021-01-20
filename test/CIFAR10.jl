@@ -1,3 +1,6 @@
+export get_processed_data, get_test_data
+
+
 using Images, Flux, MLDatasets
 using Flux: onehotbatch
 using Zygote: @nograd
@@ -5,8 +8,8 @@ using Base.Iterators: partition
 using Random
 using Statistics
 
-CIFAR_MEAN = [0.47095686, 0.46275508, 0.42994085] |> f32
-CIFAR_STD = [0.24525039, 0.24154642, 0.25916523] |> f32
+CIFAR_MEAN = [0.49139968, 0.48215827, 0.44653124] |> f32
+CIFAR_STD = [0.24703233, 0.24348505, 0.26158768] |> f32
 
 function get_test_data(get_proportion = 1.0, batchsize = 0)
     # Fetch the test data from Metalhead and get it into proper shape.
@@ -53,5 +56,3 @@ function get_processed_data(splitr = 0.5, batchsize = 64, mini = 1.0, val_batchs
     end
     return train, val
 end
-
-export get_processed_data, get_test_data

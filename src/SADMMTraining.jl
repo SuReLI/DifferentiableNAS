@@ -132,7 +132,7 @@ all_ws(model::DARTSModel) = Flux.params([model.stem, model.cells..., model.globa
 
 function ScalingADMMtrain1st!(loss, model, train, opt_w, zs, us, ρ=1e-3, losses=[0.0,0.0]; cbepoch = () -> (), cbbatch = () -> ())
     w = all_ws(model)
-    for (i, train_batch) in zip(1:length(train), CuIterator(train))
+    for (i, train_batch) in zip(1:length(train), TrainCuIterator(train))
         gsw = gradient(w) do
             train_loss = loss(model, train_batch...) + ρ/2*regterms(model, zs, us)
             return train_loss

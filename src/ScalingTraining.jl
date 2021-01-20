@@ -100,7 +100,7 @@ function Scalingtrain1st!(loss, model, train, val, opt_α, opt_w, λ=0.0001, los
     fakeg = all_αs(model).*0
     fakea = all_αs(model).*0
     global i
-    for (train_batch, val_batch) in zip(CuIterator(train), CuIterator(val))
+    for (train_batch, val_batch) in zip(TrainCuIterator(train), TrainCuIterator(val))
         gsw = gradient(w) do
             train_loss = loss(model, train_batch...) + λ*scalingreg(model)#sum([sum(abs, ss) for ss in scalingupdate(model)])
             return train_loss

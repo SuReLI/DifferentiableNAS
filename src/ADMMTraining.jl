@@ -79,7 +79,7 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, loss
         disc = -1
     end
     @show disc
-    for (i, train_batch, val_batch) in zip(1:length(train), CuIterator(train), CuIterator(val))
+    for (i, train_batch, val_batch) in zip(1:length(train), TrainCuIterator(train), TrainCuIterator(val))
         gsw = gradient(w) do
             train_loss = loss(model, train_batch...)
             return train_loss

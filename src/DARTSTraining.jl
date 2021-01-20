@@ -17,7 +17,7 @@ function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, losses=[0.0,0.0]
     local val_loss
     w = all_ws_sansbn(model)
     α = all_αs(model)
-    for (train_batch, val_batch) in zip(CuIterator(train), CuIterator(val))
+    for (train_batch, val_batch) in zip(TrainCuIterator(train), TrainCuIterator(val))
         gsw = gradient(w) do
             train_loss = loss(model, train_batch...)
             return train_loss
@@ -44,7 +44,7 @@ all_ws(model::DARTSEvalModel) = Flux.params([model.stem, model.cells..., model.g
 function DARTSevaltrain1st!(loss, model, train, opt_w, losses=[0.0,0.0]; cbepoch = () -> (), cbbatch = () -> ())
     w = all_ws(model)
     local train_loss
-    for train_batch in CuIterator(train)
+    for train_batch in EvalCuIterator(train)
         gsw = gradient(w) do
             train_loss = loss(model, train_batch...)
             return train_loss

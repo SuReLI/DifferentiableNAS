@@ -123,7 +123,7 @@ function Activationtrain1st!(loss, model, train, val, opt_α, opt_w, baseacts, l
     fakeg = all_αs(model).*0
     fakea = all_αs(model).*0
     global i
-    for (train_batch, val_batch, base_act) in zip(CuIterator(train), CuIterator(val), acts)
+    for (train_batch, val_batch, base_act) in zip(TrainCuIterator(train), TrainCuIterator(val), acts)
         gsw = gradient(w) do
             train_loss = loss(model, train_batch...)
             return train_loss

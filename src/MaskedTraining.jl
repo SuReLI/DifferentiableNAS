@@ -37,7 +37,7 @@ end
 function Standardtrain1st!(accuracy, loss, model, train, opt, losses=[0.0,0.0]; cbepoch = () -> (), cbbatch = () -> ())
     local train_loss
     w = all_ws_sansbn(model)
-    for train_batch in CuIterator(train)
+    for train_batch in TrainCuIterator(train)
         gsw = gradient(w) do
             train_loss = loss(model, train_batch...)
             return train_loss

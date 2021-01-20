@@ -10,7 +10,7 @@ using Compose
 using BSON
 using LaTeXStrings
 using PyCall
-pyimport("graphviz")
+graphviz = pyimport("graphviz")
 include("training_utils.jl")
 
 

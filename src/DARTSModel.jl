@@ -1019,7 +1019,7 @@ function discretize(
     opnames = []
     inputindices = []
     rows = 0
-    for i = 3:steps+2 #TODO test this loop, make sure it's not none
+    for i = 3:steps+2
         if disclude_1
             for j = 1:i-1
                 αs[rows+j][1] = -Inf32

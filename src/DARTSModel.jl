@@ -576,7 +576,7 @@ function (m::MixedOpBN)(
     αs::AbstractArray,
     acts::Union{Nothing,Dict} = nothing,
 )
-    if any(as .> 0)
+    if any(αs .> 0)
         m.batchnorm(sum(αs[i] * m.ops[i](x, acts, m.cellid) for i = 1:length(αs) if αs[i] > 0))
     else
         0.0 * m.ops[1](x, acts, m.cellid)

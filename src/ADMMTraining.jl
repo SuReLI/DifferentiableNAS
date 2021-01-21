@@ -96,6 +96,10 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, loss
         foreach(CUDA.unsafe_free!, val_batch)
         Flux.Optimise.update!(opt_α, α, gsα)
         CUDA.reclaim()
+        as = collect_αs(model)
+        for a in as
+
+        end
         if i%admmupdate == 0
             as = collect_αs(model)
             display(as)

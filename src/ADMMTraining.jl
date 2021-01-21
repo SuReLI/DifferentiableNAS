@@ -98,7 +98,7 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, loss
         CUDA.reclaim()
         as = collect_αs(model)
         for a in as
-
+            a[findall(<=0,a)] .= -Inf32
         end
         if i%admmupdate == 0
             as = collect_αs(model)

@@ -14,7 +14,6 @@ include("ActivationTraining.jl")
 include("MaskedTraining.jl")
 include("ScalingTraining.jl")
 include("ADMMTraining.jl")
-include("SADMMTraining.jl")
 
 include("utils.jl")
 

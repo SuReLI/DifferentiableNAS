@@ -33,8 +33,8 @@ cbbatch = CbAll(CUDA.reclaim, GC.gc, histbatch, CUDA.reclaim, GC.gc)
 
 function (hist::historiessml)()
     @show losses
-    push!(hist.normal_αs_sm, [relu.(a) for a in m.normal_αs |> cpu])
-    push!(hist.reduce_αs_sm, [relu.(a) for a in m.reduce_αs |> cpu])
+    push!(hist.normal_αs_sm, [tanh.(relu.(a)) for a in m.normal_αs |> cpu])
+    push!(hist.reduce_αs_sm, [tanh.(relu.(a)) for a in m.reduce_αs |> cpu])
     #push!(hist.activations, copy(m.activations.currentacts) |> cpu)
     push!(hist.train_losses, losses[1])
     push!(hist.val_losses, losses[2])

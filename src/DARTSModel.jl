@@ -188,7 +188,7 @@ function (m::AdaptiveMeanPool)(x)
 end
 
 PRIMITIVES = [
-    "none",
+    #"none",
     "max_pool_3x3",
     "avg_pool_3x3",
     "skip_connect",
@@ -577,7 +577,7 @@ function (m::MixedOpBN)(
     acts::Union{Nothing,Dict} = nothing,
 )
     if any(αs .> 0)
-        m.batchnorm(sum(αs[i] * m.ops[i](x, acts, m.cellid) for i = 1:length(αs) if αs[i] > 0))
+        m.batchnorm(sum(tanh(αs[i]) * m.ops[i](x, acts, m.cellid) for i = 1:length(αs) if αs[i] > 0))
     else
         0.0 * m.ops[1](x, acts, m.cellid)
     end

@@ -188,7 +188,7 @@ function (m::AdaptiveMeanPool)(x)
 end
 
 PRIMITIVES = [
-    "none",
+    #"none",
     "max_pool_3x3",
     "avg_pool_3x3",
     "skip_connect",

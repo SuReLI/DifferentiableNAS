@@ -26,6 +26,8 @@ function euclidmap(aus, cardinality)
             for k in 1:r+1
                 if !(k in keep_rows)
                     aus[i+k-1][:] .= 0
+                else
+                    aus[i+k-1][:] .= 1
                 end
             end
             i += r+1
@@ -75,7 +77,8 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, loss
     admmupdate = length(train)÷epoch
     @show admmupdate
     disc = -1
-    @show disc
+    ρ *= epoch
+    @show ρ
     for (i, train_batch, val_batch) in zip(1:length(train), TrainCuIterator(train), TrainCuIterator(val))
         gsw = gradient(w) do
             train_loss = loss(model, train_batch...)

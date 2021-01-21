@@ -74,10 +74,7 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, loss
     local val_loss
     admmupdate = length(train)÷epoch
     @show admmupdate
-    disc = length(zs[1])-epoch÷3-1 #hyperparam
-    if disc < 1
-        disc = -1
-    end
+    disc = -1
     @show disc
     for (i, train_batch, val_batch) in zip(1:length(train), TrainCuIterator(train), TrainCuIterator(val))
         gsw = gradient(w) do

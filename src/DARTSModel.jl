@@ -576,7 +576,11 @@ function (m::MixedOpBN)(
     αs::AbstractArray,
     acts::Union{Nothing,Dict} = nothing,
 )
-    m.batchnorm(sum(αs[i] * m.ops[i](x, acts, m.cellid) for i = 1:length(αs) if αs[i] > 0))
+    if any(as .> 0)
+        m.batchnorm(sum(αs[i] * m.ops[i](x, acts, m.cellid) for i = 1:length(αs) if αs[i] > 0))
+    else
+        0.0 * m.ops[1](x, acts, m.cellid)
+    end
 end
 
 Flux.@functor MixedOpBN

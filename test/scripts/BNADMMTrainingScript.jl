@@ -46,5 +46,5 @@ m = DARTSModelBN(num_cells = argparams.num_cells, channels = argparams.channels)
 zu = ADMMaux(0*vcat(m.normal_αs, m.reduce_αs), 0*vcat(m.normal_αs, m.reduce_αs))
 for epoch in 1:argparams.epochs
     @show epoch
-    ADMMtrain1st!(loss, m, train, val, optimiser_w, optimiser_α, zu, 1e-2, losses, epoch; cbepoch = cbepoch, cbbatch = cbbatch)
+    ADMMtrain1st!(loss, m, train, val, optimiser_w, optimiser_α, zu, 1e-3, losses, epoch; cbepoch = cbepoch, cbbatch = cbbatch)
 end

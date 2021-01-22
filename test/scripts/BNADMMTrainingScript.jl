@@ -12,6 +12,7 @@ include("../CIFAR10.jl")
 include("../training_utils.jl")
 @nograd onehotbatch
 
+args = parse_commandline()
 argparams = trial_params()
 
 num_ops = length(PRIMITIVES)

@@ -15,18 +15,27 @@ function parse_commandline()
         batchsize_ = 32
         num_cells_ = 4
         channels_ = 4
-        trainval_fraction_ = 0.02
+        trainval_fraction_ = Float32(0.02)
     elseif gpumem < 12.0
         batchsize_ = 32
         num_cells_ = 8
         channels_ = 16
-        trainval_fraction_ = 1.0
+        trainval_fraction_ = Float32(1.0)
+    elseif gpumem < 16.0
+        batchsize_ = 64
+        num_cells_ = 8
+        channels_ = 16
+        trainval_fraction_ = Float32(1.0)
     else
         batchsize_ = 128
         num_cells_ = 8
         channels_ = 16
-        trainval_fraction_ = 1.0
+        trainval_fraction_ = Float32(1.0)
     end
+    global batchsize_
+    global num_cells_
+    global channels_
+    global trainval_fraction_
 
     s = ArgParseSettings()
 
@@ -42,7 +51,7 @@ function parse_commandline()
         "--val_split"
             help = "fraction of train/val set to use as val set"
             arg_type = Float32
-            default = 0.5
+            default = Float32(0.5)
         "--trainval_fraction"
             help = "total fraction of train/val set to use"
             arg_type = Float32
@@ -50,7 +59,7 @@ function parse_commandline()
         "--test_fraction"
             help = "fraction of test set to use"
             arg_type = Float32
-            default = 1.0
+            default = Float32(1.0)
         "--num_cells"
             help = "number of cells in supernet"
             arg_type = Int
@@ -62,13 +71,22 @@ function parse_commandline()
         "--rho"
             help = "admm parameter"
             arg_type = Float32
-            default = 1e-3
+            default = Float32(1e-3)
     end
 
     return parse_args(s)
 end
 
-
+@with_kw struct trial_params
+    epochs::Int = 50
+    batchsize::Int = batchsize_
+    throttle_::Int = 20
+    val_split::Float32 = 0.5
+    trainval_fraction::Float32 = trainval_fraction_
+    test_fraction::Float32 = 1.0
+    num_cells::Int = num_cells_
+    channels::Int = channels_
+end
 
 function loss(m, x, y)
     out = m(x)

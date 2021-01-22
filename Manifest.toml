@@ -36,12 +36,6 @@ git-tree-sha1 = "c30985d8821e0cd73870b17b0ed0ce6dc44cb744"
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 version = "1.3.0"
 
-[[Augmentor]]
-deps = ["ComputationalResources", "CoordinateTransformations", "FileIO", "IdentityRanges", "ImageCore", "ImageFiltering", "ImageTransformations", "InteractiveUtils", "Interpolations", "LinearAlgebra", "MLDataPattern", "MappedArrays", "OffsetArrays", "Rotations", "StaticArrays"]
-git-tree-sha1 = "7caa6d4f18ce6a4919e64d4faa6a886b6af7e25b"
-uuid = "02898b10-1f73-11ea-317c-6393d7073e15"
-version = "0.6.2"
-
 [[AxisAlgorithms]]
 deps = ["LinearAlgebra", "Random", "SparseArrays", "WoodburyMatrices"]
 git-tree-sha1 = "a4d07a1c313392a77042855df46c5f534076fab9"
@@ -746,11 +740,6 @@ git-tree-sha1 = "a8bf67afad3f1ee59d367267adb7c44ccac7fdee"
 uuid = "1fad7336-0346-5a1a-a56f-a06ba010965b"
 version = "0.0.7"
 
-[[LearnBase]]
-git-tree-sha1 = "a0d90569edd490b82fdc4dc078ea54a5a800d30a"
-uuid = "7f8f8fb0-2700-5f03-b4bd-41f8cfc144b6"
-version = "0.4.1"
-
 [[LibCURL_jll]]
 deps = ["LibSSH2_jll", "Libdl", "MbedTLS_jll", "Pkg", "Zlib_jll", "nghttp2_jll"]
 git-tree-sha1 = "897d962c20031e6012bba7b3dcb7a667170dad17"
@@ -861,23 +850,11 @@ git-tree-sha1 = "eb540ede3aabb8284cb482aa41d00d6ca850b1f8"
 uuid = "856f044c-d86e-5d09-b602-aeab76dc8ba7"
 version = "2020.2.254+0"
 
-[[MLDataPattern]]
-deps = ["LearnBase", "MLLabelUtils", "Random", "SparseArrays", "StatsBase"]
-git-tree-sha1 = "e99514e96e8b8129bb333c69e063a56ab6402b5b"
-uuid = "9920b226-0b2a-5f5f-9153-9aa70a013f8b"
-version = "0.5.4"
-
 [[MLDatasets]]
 deps = ["BinDeps", "ColorTypes", "DataDeps", "DelimitedFiles", "FixedPointNumbers", "GZip", "MAT", "Requires"]
 git-tree-sha1 = "163a628fb306280708baff9aa383c5469267e1c1"
 uuid = "eb30cadb-4394-5ae3-aed4-317e484a6458"
 version = "0.5.3"
-
-[[MLLabelUtils]]
-deps = ["LearnBase", "MappedArrays", "StatsBase"]
-git-tree-sha1 = "71d874f2e97bf01dc5c44d562cea30cc7ebb81d1"
-uuid = "66a33bbf-0c2b-5fc8-a008-9da813334f0a"
-version = "0.5.5"
 
 [[MacroTools]]
 deps = ["Markdown", "Random"]

@@ -44,7 +44,7 @@ function save_progress()
     BSON.@save joinpath(base_folder, "histeval.bson") histeval
 end
 
-trial_folder = "test/models/masked_2021-01-08T09:57:42.725"
+trial_folder = "test/models/bnadmm_6642126"
 
 if "SLURM_JOB_ID" in keys(ENV)
     uniqueid = ENV["SLURM_JOB_ID"]

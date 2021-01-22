@@ -27,7 +27,7 @@ function euclidmap(aus, cardinality)
                 if !(k in keep_rows)
                     aus[i+k-1][:] .= 0
                 else
-                    aus[i+k-1][:] .= 1
+                    aus[i+k-1][:] ./ sum(aus[i+k-1][:])
                 end
             end
             i += r+1
@@ -46,7 +46,7 @@ function collect_αs(model::DARTSModel)
 end
 
 function collect_αs(model::DARTSModelBN)
-    vcat(model.normal_αs, model.reduce_αs)
+    vcat([tanh.(relu.(n)) for n in model.normal_αs], [tanh.(relu.(n)) for n in model.reduce_αs])
 end
 
 function collect_αs(model::DARTSModelSig)

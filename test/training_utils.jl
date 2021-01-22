@@ -195,7 +195,12 @@ function prepare_folder(algo)
     else
         uniqueid = Dates.now()
     end
-    base_folder = string("test/models/", algo, "_", uniqueid)
+    if ispath("/gpfs/work/p21001/maile/dnas/models/")
+        model_dir = "/gpfs/work/p21001/maile/dnas/models/"
+    else
+        model_dir = "test/models/"
+    end
+    base_folder = string(model_dir, algo, "_", uniqueid)
     mkpath(base_folder)
     base_folder
 end

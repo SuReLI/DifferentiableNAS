@@ -119,7 +119,7 @@ end
 mutable struct EvalCuIterator{B}
     batches::B
     previous::Any
-    EvalCuIterator(batches,process) = new{typeof(batches)}(batches)
+    EvalCuIterator(batches) = new{typeof(batches)}(batches)
 end
 function Base.iterate(c::EvalCuIterator, state...)
     item = iterate(c.batches, state...)

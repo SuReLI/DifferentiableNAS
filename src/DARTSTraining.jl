@@ -49,7 +49,7 @@ function DARTSevaltrain1st!(loss, model, train, opt_w, losses=[0.0,0.0]; cbepoch
             train_loss = loss(model, train_batch...)
             return train_loss
         end
-        losses[1] = train_loss
+        @show losses[1] = train_loss
         CUDA.reclaim()
         GC.gc()
         Flux.Optimise.update!(opt_w, w, gsw)

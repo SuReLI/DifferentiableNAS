@@ -7,36 +7,68 @@ using Distributions
 using BSON
 using Dates
 using Zygote
-@nograd onehotbatch
+using ArgParse
 
-gpumem = CUDA.totalmem(collect(CUDA.devices())[1])/(1024^3)
-if gpumem < 2.0
-    batchsize_ = 32
-    num_cells_ = 4
-    channels_ = 4
-    trainval_fraction_ = 0.02
-elseif gpumem < 12.0
-    batchsize_ = 32
-    num_cells_ = 8
-    channels_ = 16
-    trainval_fraction_ = 1.0
-else
-    batchsize_ = 128
-    num_cells_ = 8
-    channels_ = 16
-    trainval_fraction_ = 1.0
+function parse_commandline()
+    gpumem = CUDA.totalmem(collect(CUDA.devices())[1])/(1024^3)
+    if gpumem < 2.0
+        batchsize_ = 32
+        num_cells_ = 4
+        channels_ = 4
+        trainval_fraction_ = 0.02
+    elseif gpumem < 12.0
+        batchsize_ = 32
+        num_cells_ = 8
+        channels_ = 16
+        trainval_fraction_ = 1.0
+    else
+        batchsize_ = 128
+        num_cells_ = 8
+        channels_ = 16
+        trainval_fraction_ = 1.0
+    end
+
+    s = ArgParseSettings()
+
+    @add_arg_table! s begin
+        "--epochs"
+            help = "number of epochs"
+            arg_type = Int
+            default = 50
+        "--batchsize"
+            help = "batchsize"
+            arg_type = Int
+            default = batchsize_
+        "--val_split"
+            help = "fraction of train/val set to use as val set"
+            arg_type = Float32
+            default = 0.5
+        "--trainval_fraction"
+            help = "total fraction of train/val set to use"
+            arg_type = Float32
+            default = trainval_fraction_
+        "--test_fraction"
+            help = "fraction of test set to use"
+            arg_type = Float32
+            default = 1.0
+        "--num_cells"
+            help = "number of cells in supernet"
+            arg_type = Int
+            default = num_cells_
+        "--channels"
+            help = "number of initial in supernet"
+            arg_type = Int
+            default = channels_
+        "--rho"
+            help = "admm parameter"
+            arg_type = Float32
+            default = 1e-3
+    end
+
+    return parse_args(s)
 end
 
-@with_kw struct trial_params
-    epochs::Int = 50
-    batchsize::Int = batchsize_
-    throttle_::Int = 20
-    val_split::Float32 = 0.5
-    trainval_fraction::Float32 = trainval_fraction_
-    test_fraction::Float32 = 1.0
-    num_cells::Int = num_cells_
-    channels::Int = channels_
-end
+
 
 function loss(m, x, y)
     out = m(x)

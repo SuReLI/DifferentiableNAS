@@ -22,15 +22,16 @@ include("../training_utils.jl")
     test_fraction::Float32 = 1.0
 end
 
-argparams = eval_params()
+argparams = eval_params(batchsize::Int = 64)
 
 optimiser = Optimiser(WeightDecay(3e-4),Momentum(0.025, 0.9))
 
 train, val = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction)
 test = get_test_data(argparams.test_fraction, argparams.test_batchsize)
 
+losses = [0.0, 0.0]
+
 function (hist::historiessml)()
-    push!(hist.accuracies, accuracy_batched(m_eval, val))
     push!(hist.train_losses, losses[1])
 end
 
@@ -42,7 +43,14 @@ function save_progress()
     BSON.@save joinpath(base_folder, "histeval.bson") histeval
 end
 
-trial_folder = "test/models/bnadmm_6642126"
+trial_folder = "test/models/osirim/bnadmm_6642126"
+
+function loss(m, x, y)
+    out, aux = m(x)
+    loss = logitcrossentropy(squeeze(out), y) + 0.4*logitcrossentropy(squeeze(aux), y)
+    return loss
+end
+
 
 if "SLURM_JOB_ID" in keys(ENV)
     uniqueid = ENV["SLURM_JOB_ID"]
@@ -62,5 +70,8 @@ cbepoch = CbAll(histeval, save_progress)
 m = DARTSEvalAuxModel(normal_[length(normal_)], reduce_[length(reduce_)], num_cells=20, channels=36) |> gpu
 for epoch in 1:argparams.epochs
     @show epoch
-    DARTSevaltrain1st!(loss, m, train, optimiser; cbepoch = cbepoch)
+    DARTSevaltrain1st!(loss, m, train, optimiser, losses; cbepoch = cbepoch)
+    if epoch % 10 == 0
+        accuracy_batched(m, val)
+    end
 end

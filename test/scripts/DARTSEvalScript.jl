@@ -9,8 +9,6 @@ using Distributions
 using BSON
 using Dates
 using Plots
-using Colors
-using ColorBrewer
 include("../CIFAR10.jl")
 include("../training_utils.jl")
 

@@ -88,8 +88,6 @@ function scalingreg(model)
     collectscales
 end
 
-all_ws(model::DARTSModel) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
-
 i = 1
 function Scalingtrain1st!(loss, model, train, val, opt_α, opt_w, λ=0.0001, losses=[0.0,0.0]; cbepoch = () -> (), cbbatch = () -> ())
     local train_loss

@@ -28,6 +28,7 @@ function all_params(submodels)
 end
 
 all_αs(model) = Flux.params([model.normal_αs, model.reduce_αs])
+all_ws(model) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
 
 function all_ws_sansbn(model) #without batchnorm params
     all_w = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])

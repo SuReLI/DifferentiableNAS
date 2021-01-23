@@ -1060,7 +1060,7 @@ function EvalCell(
         prelayer1 = ReLUConvBN(channels_before_last, channels, (1, 1), 1, 0)
     end
     prelayer2 = ReLUConvBN(channels_last, channels, (1, 1), 1, 0)
-    inputindices, ops, _ = discretize(αs, channels, reduce, steps)
+    @show inputindices, ops, _ = discretize(αs, channels, reduce, steps)
     EvalCell(steps, reduce, multiplier, prelayer1, prelayer2, ops, inputindices)
 end
 

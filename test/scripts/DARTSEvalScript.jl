@@ -12,15 +12,7 @@ using Plots
 include("../CIFAR10.jl")
 include("../training_utils.jl")
 
-@with_kw struct eval_params
-    epochs::Int = 600
-    batchsize::Int = 196
-    test_batchsize::Int = 196
-    throttle_::Int = 20
-    val_split::Float32 = 0.0
-    trainval_fraction::Float32 = 1.0
-    test_fraction::Float32 = 1.0
-end
+args = parse_commandline_eval()
 
 optimiser = Optimiser(WeightDecay(3e-4),Momentum(0.025, 0.9))
 

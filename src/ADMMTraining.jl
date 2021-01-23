@@ -19,7 +19,7 @@ function euclidmap(aus, cardinality)
             to_mask = sortperm(aus[i])[1:length(aus[i])-1]
             aus[i][to_mask] .= 0
         end
-        for i in [1,13]
+        for i in [1,15]
             for r in 1:4
                 maxes = maximum(aus[i:i+r][:], dims = 2)
                 keep_rows = sortperm(maxes, rev=true)[1:2]

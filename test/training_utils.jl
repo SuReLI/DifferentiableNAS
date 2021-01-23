@@ -189,7 +189,7 @@ CbAll(cbs...) = CbAll(cbs)
 
 (cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
 
-function prepare_folder(algo)
+function prepare_folder(algo::String, args::Dict)
     if "SLURM_JOB_ID" in keys(ENV)
         uniqueid = ENV["SLURM_JOB_ID"]
     else
@@ -202,6 +202,7 @@ function prepare_folder(algo)
     end
     base_folder = string(model_dir, algo, "_", uniqueid)
     mkpath(base_folder)
+    BSON.@save joinpath(base_folder, "args.bson") args
     base_folder
 end
 
@@ -209,7 +210,7 @@ function save_progress()
     m_cpu = m |> cpu
     normal_αs = m_cpu.normal_αs
     reduce_αs = m_cpu.reduce_αs
-    BSON.@save joinpath(base_folder, "model.bson") m_cpu argparams optimiser_α optimiser_w
+    BSON.@save joinpath(base_folder, "model.bson") m_cpu optimiser_α optimiser_w
     BSON.@save joinpath(base_folder, "alphas.bson") normal_αs reduce_αs
     BSON.@save joinpath(base_folder, "histepoch.bson") histepoch
     BSON.@save joinpath(base_folder, "histbatch.bson") histbatch

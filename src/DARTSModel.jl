@@ -1263,7 +1263,7 @@ end
 function (m::DARTSEvalAuxModel)(
     x::AbstractArray,
     is_training::Bool = false,
-    drop_prob::Float32 = 0.0,
+    drop_prob::AbstractFloat = Float32(0.0),
 )
     s1 = m.stem(x)
     s2 = m.stem(x)

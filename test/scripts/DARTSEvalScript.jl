@@ -47,6 +47,11 @@ trial_folder = "test/models/bnadmm_6642126"
 
 function loss(m, x, y)
     out, aux = m(x)
+    showmx = m(x)[1] |>cpu
+    showy = y|>cpu
+    for i in 1:size(showmx,1)
+        @show (showmx[i,:], showy[i,:])
+    end
     loss = logitcrossentropy(squeeze(out), y) + 0.4*logitcrossentropy(squeeze(aux), y)
     return loss
 end
@@ -71,7 +76,7 @@ function accuracy_batched(m, xy)
         CUDA.reclaim()
         GC.gc()
     end
-    display(score / count)
+    @show ("accuracy", score / count)
     score / count
 end
 

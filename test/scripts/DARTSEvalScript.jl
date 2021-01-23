@@ -51,7 +51,13 @@ function loss(m, x, y)
     return loss
 end
 function accuracy(m, x, y)
-    out = mean(onecold(m(x)[1], 1:10)|>cpu .== onecold(y|>cpu, 1:10))
+    mx = m(x)
+    showmx = m(x)[1] |>cpu
+    showy = y|>cpu
+    for i in 1:size(showmx,1)
+        @show (showmx[i,:], showy[i,:])
+    end
+    mean(onecold(m(x)[1], 1:10)|>cpu .== onecold(y|>cpu, 1:10))
 end
 function accuracy_batched(m, xy)
     CUDA.reclaim()

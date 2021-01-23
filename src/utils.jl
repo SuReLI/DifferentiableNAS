@@ -53,15 +53,21 @@ function all_ws_sansbn(model) #without batchnorm params
     all_w
 end
 
+CIFAR_MEAN = [0.49139968, 0.48215827, 0.44653124] |> f32
+CIFAR_STD = [0.24703233, 0.24348505, 0.26158768] |> f32
+
 function process_batch!(batch::Array{Float32,4}, cutout::Int = -1)
+	mean_im = repeat(reshape(CIFAR_MEAN, (1,1,3)), outer = [32,32,1])
+	std_im = repeat(reshape(CIFAR_STD, (1,1,3)), outer = [32,32,1])
 	for image in 1:size(batch,4)
+		orig = copy(batch[:,:,:,image])
 		flip = rand(Bool)
 		shiftx = rand(-4:4)
 		shifty = rand(-4:4)
 		for x in 1:size(batch,1)
 			for y in 1:size(batch,2)
 				if minimum([x,y,x+shiftx,y+shifty]) >= 1 && maximum([x,y,x+shiftx,y+shifty]) <= size(batch,1)
-					batch[x,y,:,image] .= batch[x+shiftx,y+shifty,:,image]
+					batch[x,y,:,image] .= orig[x+shiftx,y+shifty,:]
 				end
 			end
 		end
@@ -96,6 +102,7 @@ function process_batch!(batch::Array{Float32,4}, cutout::Int = -1)
 			maxy = minimum([cuty+cutout÷2,size(batch,2)])
 			batch[minx:maxx,miny:maxy,:,image] .= 0
 		end
+		batch[:,:,:,image] = (batch[:,:,:,image].-mean_im)./std_im
 	end
 end
 

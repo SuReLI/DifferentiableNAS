@@ -1263,12 +1263,12 @@ end
 function (m::DARTSEvalAuxModel)(
     x::AbstractArray,
     is_training::Bool = false,
-    drop_prob::Float32 = Float32(0.0),
+    drop_prob::Float64 = 0.0,
 )
     s1 = m.stem(x)
     s2 = m.stem(x)
     for (i, cell) in enumerate(m.cells)
-        new_state = cell(s1, s2, drop_prob)
+        new_state = cell(s1, s2, Float32(drop_prob))
         s1 = s2
         s2 = new_state
         if i == 2 * length(m.cells) ÷ 3 + 1 && is_training

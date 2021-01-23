@@ -75,7 +75,8 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, loss
     α = all_αs(model)
     local train_loss
     local val_loss
-    admmupdate = length(train)÷epoch
+    #admmupdate = length(train)÷epoch
+    admmupdate = 10
     @show admmupdate
     disc = -1
     ρ *= epoch

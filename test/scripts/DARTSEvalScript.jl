@@ -22,12 +22,10 @@ include("../training_utils.jl")
     test_fraction::Float32 = 1.0
 end
 
-argparams = eval_params(batchsize=64)
-
 optimiser = Optimiser(WeightDecay(3e-4),Momentum(0.025, 0.9))
 
-train, val = get_processed_data(argparams.val_split, argparams.batchsize, argparams.trainval_fraction)
-test = get_test_data(argparams.test_fraction, argparams.test_batchsize)
+train, val = get_processed_data(args["val_split"], args["batchsize"], args["trainval_fraction"])
+test = get_test_data(args["test_fraction"], args["test_batchsize"])
 
 losses = [0.0, 0.0]
 
@@ -39,20 +37,20 @@ function save_progress()
     m_cpu = m |> cpu
     normal_αs = m_cpu.normal_αs
     reduce_αs = m_cpu.reduce_αs
-    BSON.@save joinpath(base_folder, "model.bson") m_cpu argparams optimiser
+    BSON.@save joinpath(base_folder, "model.bson") m_cpu optimiser
     BSON.@save joinpath(base_folder, "histeval.bson") histeval
 end
 
 trial_folder = "test/models/bnadmm_6642126"
 
 function loss(m, x, y)
-    out, aux = m(x, true, 0.2)
+    out, aux = m(x, true, args["droppath"])
     showmx = m(x)[1] |>cpu
     showy = y|>cpu
     for i in 1:size(showmx,2)
         @show (softmax(showmx[:,i]), showy[:,i])
     end
-    loss = logitcrossentropy(squeeze(out), y) + 0.4*logitcrossentropy(squeeze(aux), y)
+    loss = logitcrossentropy(squeeze(out), y) + args["aux"]*logitcrossentropy(squeeze(aux), y)
     return loss
 end
 function accuracy(m, x, y)
@@ -69,7 +67,7 @@ function accuracy_batched(m, xy)
     GC.gc()
     score = 0.0
     count = 0
-    for batch in CuIterator(xy)
+    for batch in TestCuIterator(xy)
         acc = accuracy(m, batch...)
         score += acc*length(batch)
         count += length(batch)
@@ -87,6 +85,7 @@ else
 end
 base_folder = string(trial_folder, "/eval_", uniqueid)
 mkpath(base_folder)
+BSON.@save joinpath(base_folder, "args.bson") args
 
 BSON.@load string(trial_folder, "/histepoch.bson") histepoch
 normal_ = histepoch.normal_αs_sm
@@ -96,7 +95,7 @@ histeval = historiessml()
 cbepoch = CbAll(histeval, save_progress)
 
 m = DARTSEvalAuxModel(normal_[length(normal_)], reduce_[length(reduce_)], num_cells=20, channels=36) |> gpu
-for epoch in 1:argparams.epochs
+for epoch in 1:args["epochs"]
     @show epoch
     DARTSevaltrain1st!(loss, m, train, optimiser, losses; cbepoch = cbepoch)
     if epoch % 1 == 0

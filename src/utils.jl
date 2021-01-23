@@ -1,4 +1,4 @@
-export squeeze, histories, all_αs, all_ws_sansbn, process_batch!, TrainCuIterator, EvalCuIterator
+export squeeze, histories, all_αs, all_ws_sansbn, process_batch!, process_test_batch!, TrainCuIterator, EvalCuIterator, TestCuIterator
 using Adapt
 using CUDA
 
@@ -106,6 +106,12 @@ function process_batch!(batch::Array{Float32,4}, cutout::Int = -1)
 	end
 end
 
+function process_test_batch!(batch::Array{Float32,4})
+	mean_im = repeat(reshape(CIFAR_MEAN, (1,1,3,1)), outer = [32,32,1,size(batch,4)])
+	std_im = repeat(reshape(CIFAR_STD, (1,1,3,1)), outer = [32,32,1,size(batch,4)])
+	batch = (batch.-mean_im)./std_im
+end
+
 
 mutable struct TrainCuIterator{B}
     batches::B
@@ -134,6 +140,22 @@ function Base.iterate(c::EvalCuIterator, state...)
     item === nothing && return nothing
     batch, next_state = item
 	process_batch!(batch[1], 16)
+    cubatch = map(x -> adapt(CuArray, x), batch)
+    c.previous = cubatch
+    return cubatch, next_state
+end
+
+mutable struct TestCuIterator{B}
+    batches::B
+    previous::Any
+    TestCuIterator(batches) = new{typeof(batches)}(batches)
+end
+function Base.iterate(c::TestCuIterator, state...)
+    item = iterate(c.batches, state...)
+    isdefined(c, :previous) && foreach(CUDA.unsafe_free!, c.previous)
+    item === nothing && return nothing
+    batch, next_state = item
+	process_test_batch!(batch[1])
     cubatch = map(x -> adapt(CuArray, x), batch)
     c.previous = cubatch
     return cubatch, next_state

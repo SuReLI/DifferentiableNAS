@@ -77,6 +77,83 @@ function parse_commandline()
     return parse_args(s)
 end
 
+
+function parse_commandline_eval()
+    gpumem = CUDA.totalmem(collect(CUDA.devices())[1])/(1024^3)
+    if gpumem < 2.0
+        batchsize_ = 32
+        num_cells_ = 8
+        channels_ = 16
+        trainval_fraction_ = Float32(0.02)
+    elseif gpumem < 12.0
+        batchsize_ = 32
+        num_cells_ = 20
+        channels_ = 36
+        trainval_fraction_ = Float32(1.0)
+    elseif gpumem < 16.0
+        batchsize_ = 64
+        num_cells_ = 20
+        channels_ = 36
+        trainval_fraction_ = Float32(1.0)
+    else
+        batchsize_ = 128
+        num_cells_ = 20
+        channels_ = 36
+        trainval_fraction_ = Float32(1.0)
+    end
+    global batchsize_
+    global num_cells_
+    global channels_
+    global trainval_fraction_
+
+    s = ArgParseSettings()
+
+    @add_arg_table! s begin
+        "--epochs"
+            help = "number of epochs"
+            arg_type = Int
+            default = 200
+        "--batchsize"
+            help = "batchsize"
+            arg_type = Int
+            default = batchsize_
+        "--test_batchsize"
+            help = "testset batchsize"
+            arg_type = Int
+            default = 248
+        "--val_split"
+            help = "fraction of train/val set to use as val set"
+            arg_type = Float32
+            default = Float32(0.0)
+        "--trainval_fraction"
+            help = "total fraction of train/val set to use"
+            arg_type = Float32
+            default = trainval_fraction_
+        "--test_fraction"
+            help = "fraction of test set to use"
+            arg_type = Float32
+            default = Float32(1.0)
+        "--num_cells"
+            help = "number of cells in supernet"
+            arg_type = Int
+            default = num_cells_
+        "--channels"
+            help = "number of initial in supernet"
+            arg_type = Int
+            default = channels_
+        "--droppath"
+            help = "droppath probability"
+            arg_type = Float32
+            default = Float32(0.2)
+        "--aux"
+            help = "weight of auxiliary loss"
+            arg_type = Float32
+            default = Float32(0.4)
+    end
+
+    return parse_args(s)
+end
+
 @with_kw struct trial_params
     epochs::Int = 50
     batchsize::Int = batchsize_
@@ -200,7 +277,7 @@ function prepare_folder(algo::String, args::Dict)
     else
         model_dir = "test/models/"
     end
-    base_folder = string(model_dir, algo, "_", uniqueid)
+    @show base_folder = string(model_dir, algo, "_", uniqueid)
     mkpath(base_folder)
     BSON.@save joinpath(base_folder, "args.bson") args
     base_folder

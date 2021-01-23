@@ -674,7 +674,7 @@ struct DARTSModelBN
 end
 
 function DARTSModelBN(;
-    α_init = (num_ops -> ones(num_ops) ./ num_ops + 2e-3 * (rand(num_ops) .- 0.5) |> f32),
+    α_init = (num_ops -> atanh.(ones(num_ops) ./ num_ops + 2e-3 * (rand(num_ops) .- 0.5)) |> f32),
     num_classes::Int64 = 10,
     num_cells::Int64 = 8,
     channels::Int64 = 16,

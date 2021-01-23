@@ -34,7 +34,7 @@ base_folder = prepare_folder("darts", args)
 cbepoch = CbAll(CUDA.reclaim, histepoch, save_progress, CUDA.reclaim)
 cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)
 
-for epoch in 1:argparams.epochs
+for epoch in 1:args["epochs"]
     @show epoch
     DARTStrain1st!(loss, m, train, val, optimiser_α, optimiser_w, losses; cbepoch = cbepoch, cbbatch = cbbatch)
 end

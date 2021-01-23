@@ -46,11 +46,11 @@ end
 trial_folder = "test/models/bnadmm_6642126"
 
 function loss(m, x, y)
-    out, aux = m(x)
+    out, aux = m(x, true, 0.2)
     showmx = m(x)[1] |>cpu
     showy = y|>cpu
     for i in 1:size(showmx,1)
-        @show (showmx[:,i], showy[:,i])
+        @show (softmax(showmx[:,i]), showy[:,i])
     end
     loss = logitcrossentropy(squeeze(out), y) + 0.4*logitcrossentropy(squeeze(aux), y)
     return loss
@@ -60,9 +60,9 @@ function accuracy(m, x, y)
     showmx = m(x)[1] |>cpu
     showy = y|>cpu
     for i in 1:size(showmx,1)
-        @show (showmx[:,i], showy[:,i])
+        @show (softmax(showmx[:,i]), showy[:,i])
     end
-    mean(onecold(m(x)[1], 1:10)|>cpu .== onecold(y|>cpu, 1:10))
+    mean(onecold(mx[1], 1:10)|>cpu .== onecold(y|>cpu, 1:10))
 end
 function accuracy_batched(m, xy)
     CUDA.reclaim()

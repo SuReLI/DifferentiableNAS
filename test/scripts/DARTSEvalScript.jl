@@ -22,7 +22,7 @@ include("../training_utils.jl")
     test_fraction::Float32 = 1.0
 end
 
-argparams = eval_params()
+argparams = eval_params(batchsize=64)
 
 optimiser = Optimiser(WeightDecay(3e-4),Momentum(0.025, 0.9))
 
@@ -50,7 +50,7 @@ function loss(m, x, y)
     showmx = m(x)[1] |>cpu
     showy = y|>cpu
     for i in 1:size(showmx,1)
-        @show (showmx[i,:], showy[i,:])
+        @show (showmx[:,i], showy[:,i])
     end
     loss = logitcrossentropy(squeeze(out), y) + 0.4*logitcrossentropy(squeeze(aux), y)
     return loss
@@ -60,7 +60,7 @@ function accuracy(m, x, y)
     showmx = m(x)[1] |>cpu
     showy = y|>cpu
     for i in 1:size(showmx,1)
-        @show (showmx[i,:], showy[i,:])
+        @show (showmx[:,i], showy[:,i])
     end
     mean(onecold(m(x)[1], 1:10)|>cpu .== onecold(y|>cpu, 1:10))
 end
@@ -76,7 +76,7 @@ function accuracy_batched(m, xy)
         CUDA.reclaim()
         GC.gc()
     end
-    @show ("accuracy", score / count)
+    @show ("accuracy ", score / count)
     score / count
 end
 

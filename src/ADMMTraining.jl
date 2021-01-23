@@ -27,7 +27,7 @@ function euclidmap(aus, cardinality)
                 if !(k in keep_rows)
                     aus[i+k-1][:] .= 0
                 else
-                    aus[i+k-1][:] ./ sum(aus[i+k-1][:])
+                    aus[i+k-1][:] = aus[i+k-1][:] ./ sum(aus[i+k-1][:])
                 end
             end
             i += r+1

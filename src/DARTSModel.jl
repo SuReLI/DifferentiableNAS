@@ -1244,7 +1244,7 @@ function DARTSEvalAuxModel(
         Conv((2, 2), 128 => 768, bias = false),
         BatchNorm(768),
         x -> relu.(x),
-        x -> dropdims(reshape(x, size(x, 3), :), dims = 2),
+        x -> dropdims(x, dims = (1,2)),
         Dense(768, num_classes),
     )
     global_pooling = AdaptiveMeanPool((1, 1))

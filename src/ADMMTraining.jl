@@ -15,7 +15,9 @@ using CUDA
 function euclidmap(aus, cardinality)
     if cardinality == -1 #full DARTS discretization
         for i in 1:size(aus,1)
-            #aus[i][1] = 0 #ensure we don't choose none
+            if size(aus[1],1) == 8
+                aus[i][1] = 0
+            end
             to_mask = sortperm(aus[i])[1:length(aus[i])-1]
             aus[i][to_mask] .= 0
         end
@@ -96,9 +98,11 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, loss
         end
         losses[2] = val_loss
         foreach(CUDA.unsafe_free!, val_batch)
+        before = deepcopy(collect_αs(model))
         Flux.Optimise.update!(opt_α, α, gsα)
         CUDA.reclaim()
         as = collect_αs(model)
+        display(as.-before)
         for a in as
             a[findall(<=(0),a)] .= -Inf32
         end

@@ -8,7 +8,8 @@ Activations,
 discretize,
 DARTSEvalAuxModel,
 DARTSModelBN,
-DARTSModelSig
+DARTSModelSig,
+parse_genotype
 
 using Flux
 using Base.Iterators
@@ -1060,7 +1061,93 @@ function EvalCell(
         prelayer1 = ReLUConvBN(channels_before_last, channels, (1, 1), 1, 0)
     end
     prelayer2 = ReLUConvBN(channels_last, channels, (1, 1), 1, 0)
-    @show inputindices, ops, _ = discretize(αs, channels, reduce, steps)
+    inputindices, ops, names = discretize(αs, channels, reduce, steps)
+    display(collect(zip(inputindices,names)))
+    EvalCell(steps, reduce, multiplier, prelayer1, prelayer2, ops, inputindices)
+end
+
+
+DARTS_V2 = (
+    normal = [
+        ("sep_conv_3x3", 0),
+        ("sep_conv_3x3", 1),
+        ("sep_conv_3x3", 0),
+        ("sep_conv_3x3", 1),
+        ("sep_conv_3x3", 1),
+        ("skip_connect", 0),
+        ("skip_connect", 0),
+        ("dil_conv_3x3", 2),
+    ],
+    reduce = [
+        ("max_pool_3x3", 0),
+        ("max_pool_3x3", 1),
+        ("skip_connect", 2),
+        ("max_pool_3x3", 1),
+        ("max_pool_3x3", 0),
+        ("skip_connect", 2),
+        ("skip_connect", 2),
+        ("max_pool_3x3", 1),
+    ],
+)
+
+function parse_genotype(;
+    genotype::NamedTuple=DARTS_V2,
+    channels::Int64=1,
+    reduce::Bool=false,
+    steps::Int64=4,
+)
+    prim = [
+        "none",
+        "max_pool_3x3",
+        "avg_pool_3x3",
+        "skip_connect",
+        "sep_conv_3x3",
+        "sep_conv_5x5",
+        #"sep_conv_7x7",
+        "dil_conv_3x3",
+        "dil_conv_5x5",
+        #"conv_7x1_1x7"
+    ]
+
+    ops = []
+    opnames = []
+    inputindices = []
+    if reduce
+        genocell = genotype.reduce
+    else
+        genocell = genotype.normal
+    end
+    for i = 1:steps
+        top2 = (genocell[2*i-1][2]+1, genocell[2*i][2]+1)
+        top2names = (genocell[2*i-1][1], genocell[2*i][1])
+        top2ops = Tuple(
+            OPS[top2names[j]](channels, reduce && top2[j] < 3 ? 2 : 1, 1)
+            for j in 1:2
+        )
+        push!(inputindices, top2)
+        push!(opnames, top2names)
+        push!(ops, top2ops)
+    end
+    (inputindices, ops, opnames)
+end
+
+function EvalCell(
+    channels_before_last::Int64,
+    channels_last::Int64,
+    channels::Int64,
+    reduce::Bool,
+    reduce_previous::Bool,
+    steps::Int64,
+    multiplier::Int64,
+)
+    if reduce_previous
+        prelayer1 = FactorizedReduce(channels_before_last, channels, 2)
+    else
+        prelayer1 = ReLUConvBN(channels_before_last, channels, (1, 1), 1, 0)
+    end
+    prelayer2 = ReLUConvBN(channels_last, channels, (1, 1), 1, 0)
+    inputindices, ops, names = parse_genotype(genotype=DARTS_V2, channels=channels, reduce=reduce, steps=steps)
+    display(collect(zip(inputindices,names)))
     EvalCell(steps, reduce, multiplier, prelayer1, prelayer2, ops, inputindices)
 end
 
@@ -1252,6 +1339,76 @@ function DARTSEvalAuxModel(
     DARTSEvalAuxModel(
         α_normal,
         α_reduce,
+        stem,
+        cells,
+        auxiliary,
+        global_pooling,
+        classifier,
+    )
+end
+
+function DARTSEvalAuxModel(
+    ;
+    num_cells::Int64 = 8,
+    channels::Int64 = 16,
+    num_classes::Int64 = 10,
+    steps::Int64 = 4,
+    mult::Int64 = 4,
+    stem_mult::Int64 = 3,
+)
+    channels_current = channels * stem_mult
+    stem = Chain(
+        Conv((3, 3), 3 => channels_current, pad = (1, 1), bias = false),
+        BatchNorm(channels_current),
+    )
+    channels_before_last = channels_current
+    channels_last = channels_current
+    channels_current = channels
+    channels_aux = channels
+    reduce_previous = false
+    cells = []
+    for i = 1:num_cells
+        if i == num_cells ÷ 3 + 1 || i == 2 * num_cells ÷ 3 + 1
+            channels_current = channels_current * 2
+            reduce = true
+        else
+            reduce = false
+        end
+        cell = EvalCell(
+            channels_before_last,
+            channels_last,
+            channels_current,
+            reduce,
+            reduce_previous,
+            steps,
+            mult,
+        )
+        push!(cells, cell)
+
+        reduce_previous = reduce
+        channels_before_last = channels_last
+        channels_last = mult * channels_current
+        if i == 2 * num_cells ÷ 3 + 1
+            channels_aux = channels_last
+        end
+    end
+    auxiliary = Chain(
+        x -> relu.(x), #inplace?
+        MeanPool((5, 5), pad = 0, stride = 3),
+        Conv((1, 1), channels_aux => 128, bias = false),
+        BatchNorm(128),
+        x -> relu.(x),
+        Conv((2, 2), 128 => 768, bias = false),
+        BatchNorm(768),
+        x -> relu.(x),
+        x -> dropdims(x, dims = (1,2)),
+        Dense(768, num_classes),
+    )
+    global_pooling = AdaptiveMeanPool((1, 1))
+    classifier = Dense(channels_last, num_classes)
+    DARTSEvalAuxModel(
+        [],
+        [],
         stem,
         cells,
         auxiliary,

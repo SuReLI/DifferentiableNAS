@@ -33,15 +33,11 @@ function save_progress()
     BSON.@save joinpath(base_folder, "histeval.bson") histeval
 end
 
-trial_folder = "test/models/bnadmm_6642126"
+#trial_folder = "test/models/bnadmm_6642126"
+trial_folder = "test/models/evaldarts/"
 
 function loss(m, x, y)
     out, aux = m(x, true, args["droppath"])
-    showmx = m(x)[1] |>cpu
-    showy = y|>cpu
-    for i in 1:size(showmx,2)
-        @show (softmax(showmx[:,i]), showy[:,i])
-    end
     loss = logitcrossentropy(squeeze(out), y) + args["aux"]*logitcrossentropy(squeeze(aux), y)
     return loss
 end
@@ -79,14 +75,15 @@ base_folder = string(trial_folder, "/eval_", uniqueid)
 mkpath(base_folder)
 BSON.@save joinpath(base_folder, "args.bson") args
 
-BSON.@load string(trial_folder, "/histepoch.bson") histepoch
-normal_ = histepoch.normal_αs_sm
-reduce_ = histepoch.reduce_αs_sm
+#BSON.@load string(trial_folder, "/histepoch.bson") histepoch
+#normal_ = histepoch.normal_αs_sm
+#reduce_ = histepoch.reduce_αs_sm
 
 histeval = historiessml()
 cbepoch = CbAll(histeval, save_progress)
 
-m = DARTSEvalAuxModel(normal_[length(normal_)], reduce_[length(reduce_)], num_cells=20, channels=36) |> gpu
+#m = DARTSEvalAuxModel(normal_[length(normal_)], reduce_[length(reduce_)], num_cells=20, channels=36) |> gpu
+m = DARTSEvalAuxModel(num_cells=20, channels=36) |> gpu
 for epoch in 1:args["epochs"]
     @show epoch
     DARTSevaltrain1st!(loss, m, train, optimiser, losses; cbepoch = cbepoch)

@@ -81,10 +81,10 @@ end
 function parse_commandline_eval()
     gpumem = CUDA.totalmem(collect(CUDA.devices())[1])/(1024^3)
     if gpumem < 2.0
-        batchsize_ = 32
-        num_cells_ = 8
-        channels_ = 16
-        trainval_fraction_ = Float32(0.02)
+        batchsize_ = 4
+        num_cells_ = 20
+        channels_ = 36
+        trainval_fraction_ = Float32(0.004)
     elseif gpumem < 12.0
         batchsize_ = 32
         num_cells_ = 20
@@ -277,7 +277,7 @@ function prepare_folder(algo::String, args::Dict)
     else
         model_dir = "test/models/"
     end
-    @show base_folder = string(model_dir, algo, "_", uniqueid)
+    base_folder = string(model_dir, algo, "_", uniqueid)
     mkpath(base_folder)
     BSON.@save joinpath(base_folder, "args.bson") args
     base_folder

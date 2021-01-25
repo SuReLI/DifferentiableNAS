@@ -169,7 +169,8 @@ DilConv_v(channels_in, channels_out, kernel_size, stride, pad, dilation) =
 
 Identity(stride, pad) = x -> x |> gpu
 #Zero(stride, pad) = x -> x[1:stride:end, 1:stride:end, :, :] * 0 |> gpu
-Zero(stride) = Chain(MeanPool((1, 1), stride = stride), x -> 0*x)
+#Zero(stride) = Chain(MeanPool((1, 1), stride = stride), x -> 0*x)
+Zero(stride) = stride == 2 ? Chain(MeanPool((1, 1), stride = stride), x -> 0*x) : x -> 0*x
 
 SkipConnect(channels_in, channels_out, stride, pad) =
     stride == 1 ? Identity(stride, pad) |> gpu :
@@ -1323,7 +1324,7 @@ function DARTSEvalAuxModel(
         end
     end
     auxiliary = Chain(
-        x -> relu.(x), #inplace?
+        x -> relu.(x),
         MeanPool((5, 5), pad = 0, stride = 3),
         Conv((1, 1), channels_aux => 128, bias = false),
         BatchNorm(128),

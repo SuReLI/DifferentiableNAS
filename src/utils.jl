@@ -64,30 +64,20 @@ function process_batch!(batch::Array{Float32,4}, cutout::Int = -1)
 		flip = rand(Bool)
 		shiftx = rand(-4:4)
 		shifty = rand(-4:4)
-		for x in 1:size(batch,1)
-			for y in 1:size(batch,2)
-				if minimum([x,y,x+shiftx,y+shifty]) >= 1 && maximum([x,y,x+shiftx,y+shifty]) <= size(batch,1)
-					batch[x,y,:,image] .= orig[x+shiftx,y+shifty,:]
-				end
-			end
-		end
 		if shiftx > 0
-			for x in size(batch,1)-shiftx+1:size(batch,1)
-				batch[x,:,:,image] .= 0
-			end
+			batch[1:size(batch,1)-shiftx,:,:,image] = orig[shiftx+1:size(batch,1),:,:]
+			batch[size(batch,1)-shiftx+1:size(batch,1),:,:,image] .= 0
 		elseif shiftx < 0
-			for x in 1:-shiftx
-				batch[x,:,:,image] .= 0
-			end
+			batch[1:-shiftx,:,:,image] .= 0
+			batch[1-shiftx:size(batch,1),:,:,image] = orig[1:size(batch,1)+shiftx,:,:]
 		end
+		orig = copy(batch[:,:,:,image])
 		if shifty > 0
-			for y in size(batch,2)-shifty+1:size(batch,2)
-				batch[:,y,:,image] .= 0
-			end
+			batch[:,1:size(batch,2)-shifty,:,image] = orig[:,shifty+1:size(batch,2),:]
+			batch[:,size(batch,2)-shifty+1:size(batch,2),:,image] .= 0
 		elseif shifty < 0
-			for y in 1:-shifty
-				batch[:,y,:,image] .= 0
-			end
+			batch[:,1:-shifty,:,image] .= 0
+			batch[:,1-shifty:size(batch,2),:,image] = orig[:,1:size(batch,2)+shifty,:]
 		end
 		if flip
 			mask = reverse(batch[:,:,:,image], dims=2)

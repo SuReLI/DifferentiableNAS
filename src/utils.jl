@@ -145,6 +145,7 @@ function Base.iterate(c::TrainCuIterator, state...)
     batch, next_state = item
 	flip_batch!(batch[1])
 	shift_batch!(batch[1])
+	norm_batch!(batch[1])
     cubatch = map(x -> adapt(CuArray, x), batch)
     c.previous = cubatch
     return cubatch, next_state

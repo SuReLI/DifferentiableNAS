@@ -229,7 +229,7 @@ end
 historiessm() = historiessm([],[],[],[])
 
 function (hist::historiessm)()
-    @show losses
+    #@show losses
     push!(hist.normal_αs_sm, softmax.(deepcopy(m.normal_αs)) |> cpu)
     push!(hist.reduce_αs_sm, softmax.(deepcopy(m.reduce_αs)) |> cpu)
     #push!(hist.activations, copy(m.activations.currentacts) |> cpu)
@@ -250,7 +250,7 @@ end
 historiessml() = historiessml([],[],[],[],[],[])
 
 function (hist::historiessml)()
-    @show losses
+    #@show losses
     push!(hist.normal_αs_sm, softmax.(deepcopy(m.normal_αs)) |> cpu)
     push!(hist.reduce_αs_sm, softmax.(deepcopy(m.reduce_αs)) |> cpu)
     #push!(hist.activations, copy(m.activations.currentacts) |> cpu)

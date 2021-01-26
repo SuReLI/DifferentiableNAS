@@ -49,7 +49,7 @@ m = DARTSModelBN(num_cells = args["num_cells"], channels = args["channels"]) |> 
 zu = ADMMaux(0*vcat(m.normal_αs, m.reduce_αs), 0*vcat(m.normal_αs, m.reduce_αs))
 for epoch in 1:args["epochs"]
     @show epoch
-    @show Dates.format(convert(DateTime,now()-beginscript), "HH:MM:SS")
+    display(Dates.format(convert(DateTime,now()-beginscript), "HH:MM:SS"))
     @time ADMMtrain1st!(loss, m, train, val, optimiser_w, optimiser_α, zu, args["rho"], losses, epoch; cbepoch = cbepoch, cbbatch = cbbatch)
 end
-@show "done", Dates.format(convert(DateTime,now()-beginscript), "HH:MM:SS")
+display(("done", Dates.format(convert(DateTime,now()-beginscript), "HH:MM:SS")))

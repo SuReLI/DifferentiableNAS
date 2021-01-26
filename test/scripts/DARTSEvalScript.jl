@@ -88,10 +88,10 @@ cbepoch = CbAll(histeval, save_progress)
 m = DARTSEvalAuxModel(num_cells=20, channels=36) |> gpu
 for epoch in 1:args["epochs"]
     @show epoch
-    @show Dates.format(convert(DateTime,now()-beginscript), "HH:MM:SS")
+    display(Dates.format(convert(DateTime,now()-beginscript), "HH:MM:SS"))
     @time DARTSevaltrain1st!(loss, m, train, optimiser, losses, epoch; cbepoch = cbepoch)
     if epoch % 1 == 0
         @time accuracy_batched(m, test)
     end
 end
-@show "done", Dates.format(convert(DateTime,now()-beginscript), "HH:MM:SS")
+display(("done", Dates.format(convert(DateTime,now()-beginscript), "HH:MM:SS")))

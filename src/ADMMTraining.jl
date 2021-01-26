@@ -13,7 +13,7 @@ using CUDA
 #include("DARTSModel.jl")
 
 function euclidmap(aus, cardinality)
-    if cardinality == -1 #full DARTS discretization
+    if cardinality <= 0 #full DARTS discretization
         for i in 1:size(aus,1)
             if size(aus[1],1) == 8
                 aus[i][1] = 0
@@ -70,7 +70,7 @@ mutable struct ADMMaux
     us::AbstractArray
 end
 
-function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, losses=[0.0,0.0], epoch = 1, tmax = 50; cbepoch = () -> (), cbbatch = () -> ())
+function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, losses=[0.0,0.0], epoch = 1, tmax = 50, disc = -1; cbepoch = () -> (), cbbatch = () -> ())
     zs = zu.zs
     us = zu.us
     w = all_ws_sansbn(model)
@@ -80,7 +80,9 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, loss
     #admmupdate = length(train)÷epoch
     admmupdate = 10
     @show admmupdate
-    disc = -1
+    if disc <= 0
+        disc = -1
+    end
     ρ *= epoch
     @show ρ
     opt_w.os[2].t = epoch - 1

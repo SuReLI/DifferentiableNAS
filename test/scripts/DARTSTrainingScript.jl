@@ -12,6 +12,8 @@ using Dates
 include("../CIFAR10.jl")
 include("../training_utils.jl")
 
+@show beginscript = now()
+
 @show args = parse_commandline()
 #argparams = trial_params()
 
@@ -36,5 +38,7 @@ cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)
 
 for epoch in 1:args["epochs"]
     @show epoch
-    DARTStrain1st!(loss, m, train, val, optimiser_α, optimiser_w, losses; cbepoch = cbepoch, cbbatch = cbbatch)
+    @show Dates.format(convert(DateTime,now()-beginscript), "HH:MM:SS")
+    DARTStrain1st!(loss, m, train, val, optimiser_α, optimiser_w, losses, epoch; cbepoch = cbepoch, cbbatch = cbbatch)
 end
+@show "done", Dates.format(convert(DateTime,now()-beginscript), "HH:MM:SS")

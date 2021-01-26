@@ -12,7 +12,9 @@ using Plots
 include("../CIFAR10.jl")
 include("../training_utils.jl")
 
-args = parse_commandline_eval()
+@show beginscript = now()
+
+@show args = parse_commandline_eval()
 
 optimiser = Optimiser(WeightDecay(3e-4),CosineAnnealing(args["epochs"]),Momentum(0.025, 0.9))
 
@@ -86,8 +88,10 @@ cbepoch = CbAll(histeval, save_progress)
 m = DARTSEvalAuxModel(num_cells=20, channels=36) |> gpu
 for epoch in 1:args["epochs"]
     @show epoch
-    DARTSevaltrain1st!(loss, m, train, optimiser, losses, epoch; cbepoch = cbepoch)
+    @show Dates.format(convert(DateTime,now()-beginscript), "HH:MM:SS")
+    @time DARTSevaltrain1st!(loss, m, train, optimiser, losses, epoch; cbepoch = cbepoch)
     if epoch % 1 == 0
-        accuracy_batched(m, test)
+        @time accuracy_batched(m, test)
     end
 end
+@show "done", Dates.format(convert(DateTime,now()-beginscript), "HH:MM:SS")

@@ -11,13 +11,14 @@ function get_test_data(get_proportion = 1.0, batchsize = 0)
     test_x, test_y = MLDatasets.CIFAR10.testdata(Float32)
 	total_img = Int(floor(length(test_y)*get_proportion))
 	order = 1:total_img
-    test_xy = [(test_x[:,:,:,i], test_y[i]) for i in order]
-	testY = Matrix(onehotbatch([test_xy[i][2] for i in 1:length(test_xy)], 0:9))
+	X = test_x[:,:,:,order]
+	y = test_y[order]
+	imgs = [X[:,:,:,i] for i in 1:total_img]
+	labels = Matrix(onehotbatch([y[i] for i in 1:total_img],0:9))
 	if batchsize == 0
-	    testX = cat([t[1] for t in test_xy]..., dims = 4)
-	    test = (testX,testY)
+	    test = (imgs,[labels[:,i] for i in 1:total_img])
 	else
-		test = [(cat([t[1] for t in test_xy[i]]..., dims = 4), testY[:,i]) for i in partition(1:length(test_xy), batchsize)]
+		test = [(cat(imgs[i]..., dims = 4), labels[:,i]) for i in partition(1:total_img, batchsize)]
 	end
     return test
 end

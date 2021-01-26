@@ -12,11 +12,12 @@ using CUDA
 #include("utils.jl")
 #include("DARTSModel.jl")
 
-function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, losses=[0.0,0.0]; cbepoch = () -> (), cbbatch = () -> ())
+function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, losses=[0.0,0.0], epoch = 1; cbepoch = () -> (), cbbatch = () -> ())
     local train_loss
     local val_loss
     w = all_ws_sansbn(model)
     α = all_αs(model)
+    opt_w.os[2].t = epoch - 1
     for (train_batch, val_batch) in zip(TrainCuIterator(train), TrainCuIterator(val))
         gsw = gradient(w) do
             train_loss = loss(model, train_batch...)
@@ -41,9 +42,10 @@ end
 
 all_ws(model::DARTSEvalModel) = Flux.params([model.stem, model.cells..., model.global_pooling, model.classifier])
 
-function DARTSevaltrain1st!(loss, model, train, opt_w, losses=[0.0,0.0]; cbepoch = () -> (), cbbatch = () -> ())
+function DARTSevaltrain1st!(loss, model, train, opt_w, losses=[0.0,0.0], epoch = 1; cbepoch = () -> (), cbbatch = () -> ())
     w = all_ws(model)
     local train_loss
+    opt_w.os[2].t = epoch - 1
     for train_batch in EvalCuIterator(train)
         gsw = gradient(w) do
             train_loss = loss(model, train_batch...)

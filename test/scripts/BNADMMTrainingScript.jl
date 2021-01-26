@@ -10,7 +10,6 @@ using BSON
 using Dates
 include("../CIFAR10.jl")
 include("../training_utils.jl")
-@nograd onehotbatch
 
 @show args = parse_commandline()
 #argparams = trial_params()
@@ -18,7 +17,8 @@ include("../training_utils.jl")
 num_ops = length(PRIMITIVES)
 
 optimiser_α = Optimiser(WeightDecay(1e-3),ADAM(3e-4,(0.5,0.999)))
-optimiser_w = Optimiser(WeightDecay(3e-4),Momentum(0.025, 0.9))
+optimiser_w = Optimiser(WeightDecay(3e-4),CosineAnnealing(args["epochs"]),Momentum(0.025, 0.9))
+#optimiser_w = Optimiser(WeightDecay(3e-4),Momentum(0.025, 0.9))
 
 train, val = get_processed_data(args["val_split"], args["batchsize"], args["trainval_fraction"])
 test = get_test_data(args["test_fraction"])
@@ -47,5 +47,5 @@ m = DARTSModelBN(num_cells = args["num_cells"], channels = args["channels"]) |> 
 zu = ADMMaux(0*vcat(m.normal_αs, m.reduce_αs), 0*vcat(m.normal_αs, m.reduce_αs))
 for epoch in 1:args["epochs"]
     @show epoch
-    ADMMtrain1st!(loss, m, train, val, optimiser_w, optimiser_α, zu, args["rho"], losses, epoch; cbepoch = cbepoch, cbbatch = cbbatch)
+    ADMMtrain1st!(loss, m, train, val, optimiser_w, optimiser_α, zu, args["rho"], losses, epoch, args["epochs"]; cbepoch = cbepoch, cbbatch = cbbatch)
 end

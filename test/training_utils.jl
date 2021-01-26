@@ -1,3 +1,5 @@
+export apply!
+
 using Flux
 using Flux: throttle, logitcrossentropy, onecold, onehotbatch
 using StatsBase: mean
@@ -91,7 +93,7 @@ function parse_commandline_eval()
         channels_ = 36
         trainval_fraction_ = Float32(1.0)
     elseif gpumem < 16.0
-        batchsize_ = 64
+        batchsize_ = 96
         num_cells_ = 20
         channels_ = 36
         trainval_fraction_ = Float32(1.0)

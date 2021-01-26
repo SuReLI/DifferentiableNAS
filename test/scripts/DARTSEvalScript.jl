@@ -14,7 +14,7 @@ include("../training_utils.jl")
 
 args = parse_commandline_eval()
 
-optimiser = Optimiser(WeightDecay(3e-4),Momentum(0.025, 0.9))
+optimiser = Optimiser(WeightDecay(3e-4),CosineAnnealing(args["epochs"]),Momentum(0.025, 0.9))
 
 train, val = get_processed_data(args["val_split"], args["batchsize"], args["trainval_fraction"])
 test = get_test_data(args["test_fraction"], args["test_batchsize"])
@@ -86,7 +86,7 @@ cbepoch = CbAll(histeval, save_progress)
 m = DARTSEvalAuxModel(num_cells=20, channels=36) |> gpu
 for epoch in 1:args["epochs"]
     @show epoch
-    DARTSevaltrain1st!(loss, m, train, optimiser, losses; cbepoch = cbepoch)
+    DARTSevaltrain1st!(loss, m, train, optimiser, losses, epoch; cbepoch = cbepoch)
     if epoch % 1 == 0
         accuracy_batched(m, test)
     end

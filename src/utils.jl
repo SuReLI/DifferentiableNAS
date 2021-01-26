@@ -1,6 +1,18 @@
-export squeeze, histories, all_αs, all_ws_sansbn, process_batch!, process_test_batch!, TrainCuIterator, EvalCuIterator, TestCuIterator
+export squeeze,
+    histories,
+    all_αs,
+    all_ws_sansbn,
+    process_batch!,
+    process_test_batch!,
+    TrainCuIterator,
+    EvalCuIterator,
+    TestCuIterator,
+    CosineAnnealing,
+	apply!
 using Adapt
 using CUDA
+using Flux
+import Flux.Optimise.apply!
 
 function squeeze(A::AbstractArray) #generalize this?
     if ndims(A) == 3
@@ -149,4 +161,19 @@ function Base.iterate(c::TestCuIterator, state...)
     cubatch = map(x -> adapt(CuArray, x), batch)
     c.previous = cubatch
     return cubatch, next_state
+end
+
+
+mutable struct CosineAnnealing
+  tmax::Int64
+  t::Int64
+end
+
+CosineAnnealing(tmax::Int64 = 1) = CosineAnnealing(tmax, 0)
+
+function Flux.Optimise.apply!(o::CosineAnnealing, x, Δ)
+  tmax = o.tmax
+  t = o.t
+  Δ .*= (1 + cos(t/tmax*pi))/2
+  return Δ
 end

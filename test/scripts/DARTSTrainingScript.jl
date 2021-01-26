@@ -20,7 +20,7 @@ num_ops = length(PRIMITIVES)
 m = DARTSModel(num_cells = args["num_cells"], channels = args["channels"]) |> gpu
 
 optimiser_α = Optimiser(WeightDecay(1e-3),ADAM(3e-4,(0.5,0.999)))
-optimiser_w = Optimiser(WeightDecay(3e-4),Momentum(0.025, 0.9))
+optimiser_w = Optimiser(WeightDecay(3e-4),CosineAnnealing(args["epochs"]),Momentum(0.025, 0.9))
 
 train, val = get_processed_data(args["val_split"], args["batchsize"], args["trainval_fraction"])
 test = get_test_data(args["test_fraction"])

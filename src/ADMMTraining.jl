@@ -70,7 +70,7 @@ mutable struct ADMMaux
     us::AbstractArray
 end
 
-function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, losses=[0.0,0.0], epoch = 1; cbepoch = () -> (), cbbatch = () -> ())
+function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, losses=[0.0,0.0], epoch = 1, tmax = 50; cbepoch = () -> (), cbbatch = () -> ())
     zs = zu.zs
     us = zu.us
     w = all_ws_sansbn(model)
@@ -83,6 +83,7 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, loss
     disc = -1
     ρ *= epoch
     @show ρ
+    opt_w.os[2].t = epoch - 1
     for (i, train_batch, val_batch) in zip(1:length(train), TrainCuIterator(train), TrainCuIterator(val))
         gsw = gradient(w) do
             train_loss = loss(model, train_batch...)

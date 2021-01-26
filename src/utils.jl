@@ -2,8 +2,10 @@ export squeeze,
     histories,
     all_αs,
     all_ws_sansbn,
-    process_batch!,
-    process_test_batch!,
+    flip_batch!,
+    shift_batch!,
+	cutout_batch!,
+	norm_batch!,
     TrainCuIterator,
     EvalCuIterator,
     TestCuIterator,
@@ -68,12 +70,24 @@ end
 CIFAR_MEAN = [0.49139968, 0.48215827, 0.44653124] |> f32
 CIFAR_STD = [0.24703233, 0.24348505, 0.26158768] |> f32
 
-function process_batch!(batch::Array{Float32,4}, cutout::Int = -1)
-	mean_im = repeat(reshape(CIFAR_MEAN, (1,1,3)), outer = [32,32,1])
-	std_im = repeat(reshape(CIFAR_STD, (1,1,3)), outer = [32,32,1])
+function flip_batch!(batch::Array{Float32,4})
+	flips = falses(size(batch,4))
 	for image in 1:size(batch,4)
 		orig = copy(batch[:,:,:,image])
 		flip = rand(Bool)
+		if flip
+			flipped = reverse(orig, dims=2)
+			batch[:,:,:,image] = flipped
+		end
+		flips[image] = flip
+	end
+	flips
+end
+
+function shift_batch!(batch::Array{Float32,4})
+	shifts = Array{Int64}(undef,size(batch,4),2)
+	for image in 1:size(batch,4)
+		orig = copy(batch[:,:,:,image])
 		shiftx = rand(-4:4)
 		shifty = rand(-4:4)
 		if shiftx > 0
@@ -91,24 +105,28 @@ function process_batch!(batch::Array{Float32,4}, cutout::Int = -1)
 			batch[:,1:-shifty,:,image] .= 0
 			batch[:,1-shifty:size(batch,2),:,image] = orig[:,1:size(batch,2)+shifty,:]
 		end
-		if flip
-			mask = reverse(batch[:,:,:,image], dims=2)
-			batch[:,:,:,image] .= mask
-		end
-		if cutout > 0
+		shifts[image,:] = [shiftx;shifty]
+	end
+	shifts
+end
+
+function cutout_batch!(batch::Array{Float32,4}, cutout::Int = -1)
+	cutouts = Array{Int64}(undef,size(batch,4),2)
+	if cutout > 0
+		for image in 1:size(batch,4)
 			cutx = rand(1:size(batch,1))
 			cuty = rand(1:size(batch,2))
 			minx = maximum([cutx-cutout÷2,1])
-			maxx = minimum([cutx+cutout÷2,size(batch,1)])
+			maxx = minimum([cutx+cutout÷2-1,size(batch,1)])
 			miny = maximum([cuty-cutout÷2,1])
-			maxy = minimum([cuty+cutout÷2,size(batch,2)])
+			maxy = minimum([cuty+cutout÷2-1,size(batch,2)])
 			batch[minx:maxx,miny:maxy,:,image] .= 0
+			cutouts[image,:] = [cutx;cuty]
 		end
-		batch[:,:,:,image] = (batch[:,:,:,image].-mean_im)./std_im
 	end
 end
 
-function process_test_batch!(batch::Array{Float32,4})
+function norm_batch!(batch::Array{Float32,4})
 	mean_im = repeat(reshape(CIFAR_MEAN, (1,1,3,1)), outer = [32,32,1,size(batch,4)])
 	std_im = repeat(reshape(CIFAR_STD, (1,1,3,1)), outer = [32,32,1,size(batch,4)])
 	batch = (batch.-mean_im)./std_im
@@ -125,7 +143,8 @@ function Base.iterate(c::TrainCuIterator, state...)
     isdefined(c, :previous) && foreach(CUDA.unsafe_free!, c.previous)
     item === nothing && return nothing
     batch, next_state = item
-	process_batch!(batch[1], -1)
+	flip_batch!(batch[1])
+	shift_batch!(batch[1])
     cubatch = map(x -> adapt(CuArray, x), batch)
     c.previous = cubatch
     return cubatch, next_state
@@ -141,7 +160,10 @@ function Base.iterate(c::EvalCuIterator, state...)
     isdefined(c, :previous) && foreach(CUDA.unsafe_free!, c.previous)
     item === nothing && return nothing
     batch, next_state = item
-	process_batch!(batch[1], 16)
+	flip_batch!(batch[1])
+	shift_batch!(batch[1])
+	norm_batch!(batch[1])
+	cutout_batch!(batch[1], 16)
     cubatch = map(x -> adapt(CuArray, x), batch)
     c.previous = cubatch
     return cubatch, next_state
@@ -158,6 +180,7 @@ function Base.iterate(c::TestCuIterator, state...)
     item === nothing && return nothing
     batch, next_state = item
 	process_test_batch!(batch[1])
+	norm_batch!(batch[1])
     cubatch = map(x -> adapt(CuArray, x), batch)
     c.previous = cubatch
     return cubatch, next_state

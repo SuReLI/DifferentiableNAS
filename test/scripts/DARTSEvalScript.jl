@@ -89,9 +89,9 @@ m = DARTSEvalAuxModel(num_cells = args["num_cells"], channels = args["channels"]
 for epoch in 1:args["epochs"]
     @show epoch
     display(Dates.format(convert(DateTime,now()-beginscript), "HH:MM:SS"))
-    @time DARTSevaltrain1st!(loss, m, optimiser, losses, epoch; cbepoch = cbepoch)
+    @time DARTSevaltrain1st!(loss, m, train, optimiser, losses, epoch; cbepoch = cbepoch)
     if epoch % 1 == 0
-        @time accuracy_batched(m, train[1:10])
+        @time accuracy_batched(m, test)
     end
 end
 display(("done", Dates.format(convert(DateTime,now()-beginscript), "HH:MM:SS")))

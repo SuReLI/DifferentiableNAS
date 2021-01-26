@@ -990,6 +990,7 @@ struct EvalCell
     prelayer2::Chain
     ops::AbstractArray
     inputindices::AbstractArray
+    names::AbstractArray
 end
 
 function maxk(a::AbstractArray, k::Int64)
@@ -1064,7 +1065,7 @@ function EvalCell(
     prelayer2 = ReLUConvBN(channels_last, channels, (1, 1), 1, 0)
     inputindices, ops, names = discretize(αs, channels, reduce, steps)
     display(collect(zip(inputindices,names)))
-    EvalCell(steps, reduce, multiplier, prelayer1, prelayer2, ops, inputindices)
+    EvalCell(steps, reduce, multiplier, prelayer1, prelayer2, ops, inputindices, names)
 end
 
 
@@ -1149,7 +1150,7 @@ function EvalCell(
     prelayer2 = ReLUConvBN(channels_last, channels, (1, 1), 1, 0)
     inputindices, ops, names = parse_genotype(genotype=DARTS_V2, channels=channels, reduce=reduce, steps=steps)
     display(collect(zip(inputindices,names)))
-    EvalCell(steps, reduce, multiplier, prelayer1, prelayer2, ops, inputindices)
+    EvalCell(steps, reduce, multiplier, prelayer1, prelayer2, ops, inputindices, names)
 end
 
 function droppath(x, drop_prob)
@@ -1170,11 +1171,11 @@ function (m::EvalCell)(x1::AbstractArray, x2::AbstractArray, drop_prob::Float32)
     states[2] = state2
     for step = 1:m.steps
         in1 = m.ops[step][1](states[m.inputindices[step][1]])
-        if in1 != states[m.inputindices[step][1]]
+        if m.names[step][1] != "skip_connect"
             in1 = droppath(in1, drop_prob)
         end
         in2 = m.ops[step][2](states[m.inputindices[step][2]])
-        if in2 != states[m.inputindices[step][2]]
+        if m.names[step][2] != "skip_connect"
             in2 = droppath(in2, drop_prob)
         end
         states[step+2] = in1 + in2

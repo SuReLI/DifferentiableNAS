@@ -45,7 +45,7 @@ function loss(m, x, y)
 end
 function accuracy(m, x, y)
     mx = m(x)
-    showmx = m(x)[1] |>cpu
+    showmx = mx[1] |>cpu
     showy = y|>cpu
     for i in 1:size(showmx,2)
         @show (softmax(showmx[:,i]), showy[:,i])

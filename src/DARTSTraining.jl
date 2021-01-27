@@ -12,13 +12,33 @@ using CUDA
 #include("utils.jl")
 #include("DARTSModel.jl")
 
+function accuracy(m, x, y)
+    mx = m(x)
+    showmx = m(x)[1] |>cpu
+    showy = y|>cpu
+    for i in 1:size(showmx,2)
+        @show collect(zip(softmax(showmx[:,i]), showy[:,i]))
+    end
+    mean(onecold(mx[1], 1:10)|>cpu .== onecold(y|>cpu, 1:10))
+end
+
+
+
 function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, losses=[0.0,0.0], epoch = 1; cbepoch = () -> (), cbbatch = () -> ())
     local train_loss
     local val_loss
     w = all_ws_sansbn(model)
     α = all_αs(model)
     opt_w.os[2].t = epoch - 1
+    if epoch == 29 || epoch == 30
+        display(opt_w.os)
+        display(opt_α.os)
+    end
     for (train_batch, val_batch) in zip(TrainCuIterator(train), TrainCuIterator(val))
+        if epoch == 29 || epoch == 30
+            @show accuracy(model, train_batch...)
+            @show accuracy(model, val_batch...)
+        end
         gsw = gradient(w) do
             train_loss = loss(model, train_batch...)
             return train_loss
@@ -32,6 +52,9 @@ function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, losses=[0.0,0.0]
             return val_loss
         end
         losses[2] = val_loss
+        if epoch == 29 || epoch == 30
+            @show losses
+        end
         foreach(CUDA.unsafe_free!, val_batch)
         Flux.Optimise.update!(opt_α, α, gsα)
         CUDA.reclaim()

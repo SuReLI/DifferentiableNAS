@@ -180,7 +180,6 @@ function Base.iterate(c::TestCuIterator, state...)
     isdefined(c, :previous) && foreach(CUDA.unsafe_free!, c.previous)
     item === nothing && return nothing
     batch, next_state = item
-	process_test_batch!(batch[1])
 	norm_batch!(batch[1])
     cubatch = map(x -> adapt(CuArray, x), batch)
     c.previous = cubatch

@@ -1,7 +1,7 @@
 export DARTStrain1st!, DARTStrain2nd!, DARTSevaltrain1st!, all_ws_sansbn, all_αs
 
 using Flux
-using Flux: onehotbatch
+using Flux: onehotbatch, onecold
 using Juno
 using Base.Iterators
 using StatsBase: mean

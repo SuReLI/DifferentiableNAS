@@ -13,7 +13,8 @@ using CUDA
 #include("DARTSModel.jl")
 
 function accuracy(m, x, y)
-    showmx = m(x) |>cpu
+    mx = m(x)
+    showmx = mx[1] |>cpu
     showy = y|>cpu
     for i in 1:size(showmx,2)
         @show collect(zip(softmax(showmx[:,i]), showy[:,i]))

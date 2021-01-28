@@ -19,7 +19,7 @@ function accuracy(m, x, y)
     for i in 1:size(showmx,2)
         @show collect(zip(softmax(showmx[:,i]), showy[:,i]))
     end
-    mean(onecold(mx[1], 1:10)|>cpu .== onecold(y|>cpu, 1:10))
+    mean(onecold(mx, 1:10)|>cpu .== onecold(y|>cpu, 1:10))
 end
 
 

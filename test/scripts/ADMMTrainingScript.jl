@@ -29,7 +29,7 @@ histepoch = historiessml()
 histbatch = historiessml()
 losses = [0.0, 0.0]
 
-base_folder = prepare_folder("bnadmm", args)
+base_folder = prepare_folder("admm", args)
 
 cbepoch = CbAll(CUDA.reclaim, GC.gc, histepoch, save_progress, CUDA.reclaim, GC.gc)
 cbbatch = CbAll(CUDA.reclaim, GC.gc, histbatch, CUDA.reclaim, GC.gc)
@@ -49,6 +49,7 @@ m = DARTSModelBN(num_cells = args["num_cells"], channels = args["channels"]) |> 
 zu = ADMMaux(0*vcat(m.normal_αs, m.reduce_αs), 0*vcat(m.normal_αs, m.reduce_αs))
 disc = 7
 for epoch in 1:args["epochs"]
+    local zu
     @show epoch
     display(Dates.format(convert(DateTime,now()-beginscript), "HH:MM:SS"))
     if epoch <= 5

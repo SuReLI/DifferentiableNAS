@@ -29,10 +29,6 @@ function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, losses=[0.0,0.0]
     w = all_ws_sansbn(model)
     α = all_αs(model)
     opt_w.os[2].t = epoch - 1
-    if epoch == 29 || epoch == 30
-        display(opt_w.os)
-        display(opt_α.os)
-    end
     for (train_batch, val_batch) in zip(TrainCuIterator(train), TrainCuIterator(val))
         if epoch == 29 || epoch == 30
             @show accuracy(model, train_batch...)

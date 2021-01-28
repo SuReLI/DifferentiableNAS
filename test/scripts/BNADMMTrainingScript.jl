@@ -14,16 +14,18 @@ include("../training_utils.jl")
 @show beginscript = now()
 
 @show args = parse_commandline()
-#argparams = trial_params()
 
+if args["random_seed"] > -1
+    Random.seed!(args["random_seed"])
+end
 num_ops = length(PRIMITIVES)
 
 optimiser_α = Optimiser(WeightDecay(1e-3),ADAM(3e-4,(0.5,0.999)))
 optimiser_w = Optimiser(WeightDecay(3e-4),CosineAnnealing(args["epochs"]),Momentum(0.025, 0.9))
 #optimiser_w = Optimiser(WeightDecay(3e-4),Momentum(0.025, 0.9))
 
-train, val = get_processed_data(args["val_split"], args["batchsize"], args["trainval_fraction"])
-test = get_test_data(args["test_fraction"])
+train, val = get_processed_data(args["val_split"], args["batchsize"], args["trainval_fraction"], args["random_seed"])
+test = get_test_data(args["test_fraction"], args["random_seed"])
 
 histepoch = historiessml()
 histbatch = historiessml()
@@ -47,6 +49,7 @@ end
 
 m = DARTSModelBN(num_cells = args["num_cells"], channels = args["channels"]) |> gpu
 zu = ADMMaux(0*vcat(m.normal_αs, m.reduce_αs), 0*vcat(m.normal_αs, m.reduce_αs))
+local epoch
 for epoch in 1:args["epochs"]
     @show epoch
     display(Dates.format(convert(DateTime,now()-beginscript), "HH:MM:SS"))

@@ -8,13 +8,17 @@ using CUDA
 using Distributions
 using BSON
 using Dates
+using Random
 include("../CIFAR10.jl")
 include("../training_utils.jl")
 
 @show beginscript = now()
 
 @show args = parse_commandline()
-#argparams = trial_params()
+
+if args["random_seed"] > -1
+    Random.seed!(args["random_seed"])
+end
 
 num_ops = length(PRIMITIVES)
 
@@ -22,8 +26,8 @@ optimiser_α = Optimiser(WeightDecay(1e-3),ADAM(3e-4,(0.5,0.999)))
 optimiser_w = Optimiser(WeightDecay(3e-4),CosineAnnealing(args["epochs"]),Momentum(0.025, 0.9))
 #optimiser_w = Optimiser(WeightDecay(3e-4),Momentum(0.025, 0.9))
 
-train, val = get_processed_data(args["val_split"], args["batchsize"], args["trainval_fraction"])
-test = get_test_data(args["test_fraction"])
+train, val = get_processed_data(args["val_split"], args["batchsize"], args["trainval_fraction"], args["random_seed"])
+test = get_test_data(args["test_fraction"], args["random_seed"])
 
 histepoch = historiessml()
 histbatch = historiessml()
@@ -31,8 +35,8 @@ losses = [0.0, 0.0]
 
 base_folder = prepare_folder("admm", args)
 
-cbepoch = CbAll(CUDA.reclaim, GC.gc, histepoch, save_progress, CUDA.reclaim, GC.gc)
-cbbatch = CbAll(CUDA.reclaim, GC.gc, histbatch, CUDA.reclaim, GC.gc)
+cbepoch = CbAll(histepoch, save_progress)
+cbbatch = CbAll(histbatch)
 
 function (hist::historiessml)()
     @show losses
@@ -41,8 +45,8 @@ function (hist::historiessml)()
     #push!(hist.activations, copy(m.activations.currentacts) |> cpu)
     push!(hist.train_losses, losses[1])
     push!(hist.val_losses, losses[2])
-    CUDA.reclaim()
-    GC.gc()
+    #CUDA.reclaim()
+    #GC.gc()
 end
 
 m = DARTSModelBN(num_cells = args["num_cells"], channels = args["channels"]) |> gpu

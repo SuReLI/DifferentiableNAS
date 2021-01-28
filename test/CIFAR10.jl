@@ -7,7 +7,10 @@ using Base.Iterators: partition
 using Random
 using Statistics
 
-function get_test_data(get_proportion = 1.0, batchsize = 0)
+function get_test_data(get_proportion = 1.0, batchsize = 0, random_seed = -1)
+	if random_seed > -1
+	    Random.seed!(random_seed)
+	end
     test_x, test_y = MLDatasets.CIFAR10.testdata(Float32)
 	total_img = Int(floor(length(test_y)*get_proportion))
 	order = 1:total_img
@@ -24,7 +27,10 @@ function get_test_data(get_proportion = 1.0, batchsize = 0)
 end
 
 
-function get_processed_data(splitr = 0.5, batchsize = 64, mini = 1.0, val_batchsize = 0)
+function get_processed_data(splitr = 0.5, batchsize = 64, mini = 1.0, val_batchsize = 0, random_seed = -1)
+	if random_seed > -1
+	    Random.seed!(random_seed)
+	end
 	train_x, train_y = MLDatasets.CIFAR10.traindata(Float32)
     total_img = Int(floor(length(train_y)*mini))
 	order = shuffle(1:total_img)

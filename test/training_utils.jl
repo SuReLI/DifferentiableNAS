@@ -46,6 +46,14 @@ function parse_commandline()
             help = "number of epochs"
             arg_type = Int
             default = 50
+        "--random_seed"
+            help = "random seed (-1 for no random seed)"
+            arg_type = Int
+            default = 32
+        "--checkpoint"
+            help = "how often to save checkpoints (-1 for no checkpointing)"
+            arg_type = Int
+            default = -1
         "--batchsize"
             help = "batchsize"
             arg_type = Int
@@ -114,7 +122,15 @@ function parse_commandline_eval()
         "--epochs"
             help = "number of epochs"
             arg_type = Int
-            default = 200
+            default = 600
+        "--random_seed"
+            help = "random seed (-1 for no random seed)"
+            arg_type = Int
+            default = 32
+        "--checkpoint"
+            help = "how often to save checkpoints (-1 for no checkpointing)"
+            arg_type = Int
+            default = -1
         "--batchsize"
             help = "batchsize"
             arg_type = Int
@@ -276,6 +292,8 @@ function prepare_folder(algo::String, args::Dict)
     end
     if ispath("/gpfs/work/p21001/maile/dnas/models/")
         model_dir = "/gpfs/work/p21001/maile/dnas/models/"
+    elseif ispath("/gpfs/work/p21001/maile/dnas/models/")
+        model_dir = "/projets/reva/kmaile/dnas/models/"
     else
         model_dir = "test/models/"
     end
@@ -289,8 +307,11 @@ function save_progress()
     m_cpu = m |> cpu
     normal_αs = m_cpu.normal_αs
     reduce_αs = m_cpu.reduce_αs
-    BSON.@save joinpath(base_folder, "model.bson") m_cpu optimiser_α optimiser_w
+    BSON.@save joinpath(base_folder, "model.bson") m_cpu
     BSON.@save joinpath(base_folder, "alphas.bson") normal_αs reduce_αs
     BSON.@save joinpath(base_folder, "histepoch.bson") histepoch
     BSON.@save joinpath(base_folder, "histbatch.bson") histbatch
+    if args["checkpoint"] > 0 && length(histepoch.train_losses) % args["checkpoint"] == 0
+        BSON.@save joinpath(base_folder, string("model", length(histepoch.train_losses), ".bson")) m_cpu
+    end
 end

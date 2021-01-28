@@ -10,12 +10,10 @@ using Zygote: @nograd
 using LinearAlgebra
 using CUDA
 using Plots
-#include("utils.jl")
-#include("DARTSModel.jl")
+
 
 function collectscales(model)
     for (i,cell) in enumerate(m.cells)
-        #cell.reduction
         for (j,mixedop) in enumerate(cell.mixedops)
             for (k,op) in enumerate(mixedop.ops)
                 for (l,layer) in enumerate(op.op)

@@ -9,8 +9,7 @@ using Zygote
 using Zygote: @nograd
 using LinearAlgebra
 using CUDA
-#include("utils.jl")
-#include("DARTSModel.jl")
+
 
 function euclidmap(aus, cardinality)
     if cardinality <= 0 #full DARTS discretization
@@ -80,9 +79,6 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, loss
     #admmupdate = length(train)÷epoch
     admmupdate = 10
     @show admmupdate
-    if disc <= 0
-        disc = -1
-    end
     ρ *= epoch
     @show ρ
     opt_w.os[2].t = epoch - 1

@@ -16,15 +16,20 @@ include("../training_utils.jl")
 
 @show args = parse_commandline_eval()
 
+if args["random_seed"] > -1
+    Random.seed!(args["random_seed"])
+end
+
 optimiser = Optimiser(WeightDecay(3e-4),CosineAnnealing(args["epochs"]),Momentum(0.025, 0.9))
 
-train, val = get_processed_data(args["val_split"], args["batchsize"], args["trainval_fraction"])
-test = get_test_data(args["test_fraction"], args["test_batchsize"])
+train, val = get_processed_data(args["val_split"], args["batchsize"], args["trainval_fraction"], args["random_seed"])
+test = get_test_data(args["test_fraction"], args["random_seed"])
 
 losses = [0.0, 0.0]
 
 function (hist::historiessml)()
     push!(hist.train_losses, losses[1])
+    push!(hist.accuracies, losses[2])
 end
 
 function save_progress()
@@ -90,8 +95,8 @@ for epoch in 1:args["epochs"]
     @show epoch
     display(Dates.format(convert(DateTime,now()-beginscript), "HH:MM:SS"))
     @time DARTSevaltrain1st!(loss, m, train, optimiser, losses, epoch; cbepoch = cbepoch)
-    if epoch % 1 == 0
-        @time accuracy_batched(m, test)
+    if epoch % 10 == 0
+        @time losses[2] = accuracy_batched(m, test)
     end
 end
 display(("done", Dates.format(convert(DateTime,now()-beginscript), "HH:MM:SS")))

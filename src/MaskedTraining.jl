@@ -9,10 +9,6 @@ using Zygote
 using Zygote: @nograd
 using LinearAlgebra
 using CUDA
-#include("utils.jl")
-#include("DARTSModel.jl")
-@nograd onehotbatch
-@nograd softmax
 
 function perturb(αs::AbstractArray)
     counter = [ones(length(a)) for a in αs]

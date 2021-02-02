@@ -1,5 +1,5 @@
-export squeeze,
-    histories,
+export ccat,
+	squeeze,
     all_αs,
     all_ws_sansbn,
     flip_batch!,
@@ -15,6 +15,8 @@ using Adapt
 using CUDA
 using Flux
 import Flux.Optimise.apply!
+
+ccat(X...) = cat(X...; dims=3)
 
 function squeeze(A::AbstractArray) #generalize this?
     if ndims(A) == 3

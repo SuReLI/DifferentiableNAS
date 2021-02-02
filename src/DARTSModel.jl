@@ -202,7 +202,6 @@ PRIMITIVES = [
     #"conv_7x1_1x7"
 ]
 
-#TODO: change to NamedTuple
 OPS = Dict(
     "none" => (channels, stride, w) -> Chain(Zero(stride)),
     "avg_pool_3x3" =>
@@ -410,8 +409,6 @@ function Cell(
     end
     Cell(steps, reduce, multiplier, prelayer1, prelayer2, mixedops)
 end
-
-ccat(X...) = cat(X...; dims=3)
 
 function (m::Cell)(
     x1::AbstractArray,

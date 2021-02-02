@@ -20,8 +20,6 @@ if args["random_seed"] > -1
     Random.seed!(args["random_seed"])
 end
 
-num_ops = length(PRIMITIVES)
-
 m = DARTSModel(num_cells = args["num_cells"], channels = args["channels"]) |> gpu
 
 optimiser_α = Optimiser(WeightDecay(1f-3),ADAM(3f-4,(0.5f0,0.999f0)))

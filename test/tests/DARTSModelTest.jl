@@ -2,11 +2,6 @@ using DifferentiableNAS
 using Flux
 using CUDA
 using Distributions: Bernoulli
-include("../CIFAR10.jl")
-
-@testset "Softmax" begin
-
-end
 
 @testset "DARTS MixedOp" begin
     steps = 4
@@ -70,7 +65,7 @@ end
     num_ops = length(PRIMITIVES)
     data = rand(Float32,8,8,4,2) |> gpu
     αs = [2e-3*(rand(num_ops).-0.5) |> f32 |> gpu  for _ in 1:k]
-    cell = EvalCell(4, 4, 1, false, false, 4, 4, αs) |> gpu
+    cell = EvalCell(4, 4, 1, false, false, 4, 4, αs, PRIMITIVES) |> gpu
     @test length(Flux.params(cell).order) > 0
     as = [2e-3*(rand(num_ops).-0.5) |> f32 |> gpu  for _ in 1:k]
     @test size(data) == size(cell(data, data, Float32(0.4)))
@@ -109,7 +104,7 @@ end
     @test length(Flux.params(m.cells).order) > 1
     test_image = rand(Float32, 32, 32, 3, 1) |> gpu
     out, out_aux = m(test_image, true)
-    @test size(out) == size(out_aux)
+    @test size(out,1) == size(out_aux,1)
     grad = gradient(x->sum(m(x, true)[1]), test_image)
     @test size(test_image) ==  size(grad[1])
     loss(m, x) = sum(m(x, true, Float32(0.4)))

@@ -190,7 +190,7 @@ function (m::AdaptiveMeanPool)(x)
 end
 
 PRIMITIVES = [
-    #"none",
+    "none",
     "max_pool_3x3",
     "avg_pool_3x3",
     "skip_connect",
@@ -335,6 +335,7 @@ function MixedOp(
     name::String,
     channels::Int64,
     stride::Int64,
+    operations::Array{String,1} = PRIMITIVES,
     track_acts::Bool = false,
 )
     if track_acts
@@ -346,8 +347,8 @@ function MixedOp(
         cellid,
         name,
         [
-            op(string(name, "-", prim), OPS[prim](channels, stride, 1) |> gpu)
-            for prim in PRIMITIVES
+            op(string(name, "-", operation), OPS[operation](channels, stride, 1) |> gpu)
+            for operation in operations
         ],
     ) |> gpu
 end
@@ -381,6 +382,7 @@ function Cell(
     steps::Int64,
     multiplier::Int64,
     cellid::Int64,
+    operations::Array{String,1} = PRIMITIVES,
     track_acts::Bool = false,
 )
     if reduce_previous
@@ -400,6 +402,7 @@ function Cell(
                     string(j, "-", i),
                     channels,
                     stride,
+                    operations,
                     track_acts,
                 ) |> gpu
             push!(mixedops, mixedop)
@@ -451,6 +454,7 @@ struct DARTSModel
     cells::AbstractArray
     global_pooling::AdaptiveMeanPool
     classifier::Dense
+    operations::Array{String,1}
     activations::Activations
 end
 
@@ -462,6 +466,7 @@ function DARTSModel(;
     steps::Int64 = 4,
     mult::Int64 = 4,
     stem_mult::Int64 = 3,
+    operations::Array{String,1} = PRIMITIVES,
     track_acts::Bool = false,
 )
     channels_current = channels * stem_mult
@@ -492,7 +497,8 @@ function DARTSModel(;
                 steps,
                 mult,
                 i,
-                track_acts,
+                operations,
+                track_acts
             ) |> gpu
         push!(cells, cell)
 
@@ -503,7 +509,7 @@ function DARTSModel(;
     global_pooling = AdaptiveMeanPool((1, 1)) |> gpu
     classifier = Dense(channels_last, num_classes) |> gpu
     k = floor(Int, steps^2 / 2 + 3 * steps / 2)
-    num_ops = length(PRIMITIVES)
+    num_ops = length(operations)
     α_normal = [α_init(num_ops) for _ = 1:k]
     α_reduce = [α_init(num_ops) for _ = 1:k]
     activations = Activations(Dict{String,Array{Float32,3}}())
@@ -514,7 +520,8 @@ function DARTSModel(;
         cells,
         global_pooling,
         classifier,
-        activations,
+        operations,
+        activations
     )
 end
 
@@ -555,6 +562,7 @@ function MixedOpBN(
     name::String,
     channels::Int64,
     stride::Int64,
+    operations::Array{String,1} = PRIMITIVES[2:end],
     track_acts::Bool = false,
 )
     if track_acts
@@ -567,7 +575,7 @@ function MixedOpBN(
         name,
         [
             op(string(name, "-", prim), OPS[prim](channels, stride, 1) |> gpu)
-            for prim in PRIMITIVES
+            for prim in operations
         ],
         BatchNorm(channels)
     ) |> gpu
@@ -605,6 +613,7 @@ function CellBN(
     steps::Int64,
     multiplier::Int64,
     cellid::Int64,
+    operations::Array{String,1} = PRIMITIVES[2:end],
     track_acts::Bool = false,
 )
     if reduce_previous
@@ -624,6 +633,7 @@ function CellBN(
                     string(j, "-", i),
                     channels,
                     stride,
+                    operations,
                     track_acts,
                 ) |> gpu
             push!(mixedops, mixedop)
@@ -672,6 +682,7 @@ struct DARTSModelBN
     cells::AbstractArray
     global_pooling::AdaptiveMeanPool
     classifier::Dense
+    operations::Array{String,1}
     activations::Activations
 end
 
@@ -683,6 +694,7 @@ function DARTSModelBN(;
     steps::Int64 = 4,
     mult::Int64 = 4,
     stem_mult::Int64 = 3,
+    operations::Array{String,1} = PRIMITIVES[2:end],
     track_acts::Bool = false,
 )
     channels_current = channels * stem_mult
@@ -713,6 +725,7 @@ function DARTSModelBN(;
                 steps,
                 mult,
                 i,
+                operations,
                 track_acts,
             ) |> gpu
         push!(cells, cell)
@@ -724,7 +737,7 @@ function DARTSModelBN(;
     global_pooling = AdaptiveMeanPool((1, 1)) |> gpu
     classifier = Dense(channels_last, num_classes) |> gpu
     k = floor(Int, steps^2 / 2 + 3 * steps / 2)
-    num_ops = length(PRIMITIVES)
+    num_ops = length(operations)
     α_normal = [α_init(num_ops) for _ = 1:k]
     α_reduce = [α_init(num_ops) for _ = 1:k]
     activations = Activations(Dict{String,Array{Float32,3}}())
@@ -735,23 +748,17 @@ function DARTSModelBN(;
         cells,
         global_pooling,
         classifier,
+        operations,
         activations,
     )
 end
 
-function (m::DARTSModelBN)(x; αs::AbstractArray = [])
-    if length(αs) > 0
-        normal_αs = αs[1]
-        reduce_αs = αs[2]
-    else
-        normal_αs = m.normal_αs
-        reduce_αs = m.reduce_αs
-    end
+function (m::DARTSModelBN)(x)
     s1 = m.stem(x)
     s2 = m.stem(x)
     m.activations.currentacts = Dict{String,Array{Float32,3}}()
     for (i, cell) in enumerate(m.cells)
-        cell.reduction ? αs = reduce_αs : αs = normal_αs
+        cell.reduction ? αs = m.reduce_αs : αs = m.normal_αs
         new_state = cell(s1, s2, αs, m.activations.currentacts)
         s1 = s2
         s2 = new_state
@@ -776,6 +783,7 @@ function MixedOpSig(
     name::String,
     channels::Int64,
     stride::Int64,
+    operations::Array{String,1} = PRIMITIVES[2:end],
     track_acts::Bool = false,
 )
     if track_acts
@@ -788,7 +796,7 @@ function MixedOpSig(
         name,
         [
             op(string(name, "-", prim), OPS[prim](channels, stride, 1) |> gpu)
-            for prim in PRIMITIVES
+            for prim in operations
         ],
         BatchNorm(channels)
     ) |> gpu
@@ -822,6 +830,7 @@ function CellSig(
     steps::Int64,
     multiplier::Int64,
     cellid::Int64,
+    operations::Array{String,1} = PRIMITIVES[2:end],
     track_acts::Bool = false,
 )
     if reduce_previous
@@ -841,6 +850,7 @@ function CellSig(
                     string(j, "-", i),
                     channels,
                     stride,
+                    operations,
                     track_acts,
                 ) |> gpu
             push!(mixedops, mixedop)
@@ -889,6 +899,7 @@ struct DARTSModelSig
     cells::AbstractArray
     global_pooling::AdaptiveMeanPool
     classifier::Dense
+    operations::Array{String,1}
     activations::Activations
 end
 
@@ -900,6 +911,7 @@ function DARTSModelSig(;
     steps::Int64 = 4,
     mult::Int64 = 4,
     stem_mult::Int64 = 3,
+    operations::Array{String,1} = PRIMITIVES[2:end],
     track_acts::Bool = false,
 )
     channels_current = channels * stem_mult
@@ -930,6 +942,7 @@ function DARTSModelSig(;
                 steps,
                 mult,
                 i,
+                operations,
                 track_acts,
             ) |> gpu
         push!(cells, cell)
@@ -941,7 +954,7 @@ function DARTSModelSig(;
     global_pooling = AdaptiveMeanPool((1, 1)) |> gpu
     classifier = Dense(channels_last, num_classes) |> gpu
     k = floor(Int, steps^2 / 2 + 3 * steps / 2)
-    num_ops = length(PRIMITIVES)
+    num_ops = length(operations)
     α_normal = [α_init(num_ops) for _ = 1:k]
     α_reduce = [α_init(num_ops) for _ = 1:k]
     activations = Activations(Dict{String,Array{Float32,3}}())
@@ -952,6 +965,7 @@ function DARTSModelSig(;
         cells,
         global_pooling,
         classifier,
+        operations,
         activations,
     )
 end
@@ -1003,24 +1017,14 @@ function discretize(
     channels::Int64,
     reduce::Bool,
     steps::Int64,
+    operations::Array{String,1} = PRIMITIVES,
+    plotting::Bool = false,
     disclude_1::Bool = true,
 )
-    prim = [
-        "none",
-        "max_pool_3x3",
-        "avg_pool_3x3",
-        "skip_connect",
-        "sep_conv_3x3",
-        "sep_conv_5x5",
-        #"sep_conv_7x7",
-        "dil_conv_3x3",
-        "dil_conv_5x5",
-        #"conv_7x1_1x7"
-    ]
-
-    if length(αs[1]) == 7
-        prim = prim[2:8]
+    if "none" in operations
         disclude_1 = false
+    else
+        disclude_1 = true
     end
     ops = []
     opnames = []
@@ -1034,14 +1038,16 @@ function discretize(
         end
         options = [findmax(αs[rows+j]) for j = 1:i-1]
         top2 = partialsortperm(options, 1:2, by = x -> x[1], rev = true)
-        top2names = Tuple(prim[options[i][2]] for i in top2)
-        top2ops = Tuple(
-            OPS[prim[options[i][2]]](channels, reduce && i < 3 ? 2 : 1, 1)
-            for i in top2
-        )
+        top2names = Tuple(operations[options[i][2]] for i in top2)
+        if !plotting
+            top2ops = Tuple(
+                OPS[operations[options[i][2]]](channels, reduce && i < 3 ? 2 : 1, 1)
+                for i in top2
+            )
+            push!(ops, top2ops)
+        end
         push!(inputindices, top2)
         push!(opnames, top2names)
-        push!(ops, top2ops)
         rows += i - 1
     end
     (inputindices, ops, opnames)
@@ -1056,6 +1062,7 @@ function EvalCell(
     steps::Int64,
     multiplier::Int64,
     αs::AbstractArray,
+    operations::Array{String,1} = PRIMITIVES,
 )
     if reduce_previous
         prelayer1 = FactorizedReduce(channels_before_last, channels, 2)
@@ -1063,8 +1070,7 @@ function EvalCell(
         prelayer1 = ReLUConvBN(channels_before_last, channels, (1, 1), 1, 0)
     end
     prelayer2 = ReLUConvBN(channels_last, channels, (1, 1), 1, 0)
-    inputindices, ops, names = discretize(αs, channels, reduce, steps)
-    display(collect(zip(inputindices,names)))
+    inputindices, ops, names = discretize(αs, channels, reduce, steps, operations)
     EvalCell(steps, reduce, multiplier, prelayer1, prelayer2, ops, inputindices, names)
 end
 
@@ -1193,6 +1199,7 @@ struct DARTSEvalModel
     cells::AbstractArray
     global_pooling::AdaptiveMeanPool
     classifier::Dense
+    operations::Array{String,1}
 end
 
 function DARTSEvalModel(
@@ -1204,6 +1211,7 @@ function DARTSEvalModel(
     steps::Int64 = 4,
     mult::Int64 = 4,
     stem_mult::Int64 = 3,
+    operations::Array{String,1} = PRIMITIVES,
 )
     channels_current = channels * stem_mult
     stem = Chain(
@@ -1233,6 +1241,7 @@ function DARTSEvalModel(
             steps,
             mult,
             αs,
+            operations,
         )
         push!(cells, cell)
 
@@ -1243,7 +1252,7 @@ function DARTSEvalModel(
 
     global_pooling = AdaptiveMeanPool((1, 1))
     classifier = Dense(channels_last, num_classes)
-    DARTSEvalModel(α_normal, α_reduce, stem, cells, global_pooling, classifier)
+    DARTSEvalModel(α_normal, α_reduce, stem, cells, global_pooling, classifier, operations)
 end
 
 function (m::DARTSEvalModel)(
@@ -1273,6 +1282,7 @@ struct DARTSEvalAuxModel
     auxiliary::Chain
     global_pooling::AdaptiveMeanPool
     classifier::Dense
+    operations::Array{String,1}
 end
 
 function DARTSEvalAuxModel(
@@ -1284,6 +1294,7 @@ function DARTSEvalAuxModel(
     steps::Int64 = 4,
     mult::Int64 = 4,
     stem_mult::Int64 = 3,
+    operations::Array{String,1} = PRIMITIVES,
 )
     channels_current = channels * stem_mult
     stem = Chain(
@@ -1314,6 +1325,7 @@ function DARTSEvalAuxModel(
             steps,
             mult,
             αs,
+            operations,
         )
         push!(cells, cell)
 
@@ -1346,6 +1358,7 @@ function DARTSEvalAuxModel(
         auxiliary,
         global_pooling,
         classifier,
+        operations,
     )
 end
 
@@ -1416,6 +1429,7 @@ function DARTSEvalAuxModel(
         auxiliary,
         global_pooling,
         classifier,
+        PRIMITIVES
     )
 end
 

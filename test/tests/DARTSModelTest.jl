@@ -68,8 +68,8 @@ end
     cell = EvalCell(4, 4, 1, false, false, 4, 4, αs, PRIMITIVES) |> gpu
     @test length(Flux.params(cell).order) > 0
     as = [2e-3*(rand(num_ops).-0.5) |> f32 |> gpu  for _ in 1:k]
-    @test size(data) == size(cell(data, data, Float32(0.4)))
-    grad = gradient((x1, x2) -> sum(cell(x1, x2, Float32(0.4))), data, data)
+    @test size(data) == size(cell(data, data, 0.4f0))
+    grad = gradient((x1, x2) -> sum(cell(x1, x2, 0.4f0)), data, data)
     @test size(data) == size(grad[1])
 end
 
@@ -85,7 +85,7 @@ end
     test_image = rand(Float32, 32, 32, 3, 1) |> gpu
     grad = gradient(x->sum(m(x)), test_image)
     @test size(test_image) ==  size(grad[1])
-    loss(m, x) = sum(m(x, Float32(0.4)))
+    loss(m, x) = sum(m(x, 0.4f0))
     gws = gradient(Flux.params(m.cells)) do
         sum(m(test_image))
     end
@@ -107,7 +107,7 @@ end
     @test size(out,1) == size(out_aux,1)
     grad = gradient(x->sum(m(x, true)[1]), test_image)
     @test size(test_image) ==  size(grad[1])
-    loss(m, x) = sum(m(x, true, Float32(0.4)))
+    loss(m, x) = sum(m(x, true, 0.4f0))
     gws = gradient(Flux.params(m.cells)) do
         sum(sum(m(test_image, true)))
     end

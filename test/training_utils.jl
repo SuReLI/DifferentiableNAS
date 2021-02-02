@@ -17,22 +17,22 @@ function parse_commandline()
         batchsize_ = 32
         num_cells_ = 4
         channels_ = 4
-        trainval_fraction_ = Float32(0.02)
+        trainval_fraction_ = 2f-2
     elseif gpumem < 12.0
         batchsize_ = 32
         num_cells_ = 8
         channels_ = 16
-        trainval_fraction_ = Float32(1.0)
+        trainval_fraction_ = 1f0
     elseif gpumem < 16.0
         batchsize_ = 64
         num_cells_ = 8
         channels_ = 16
-        trainval_fraction_ = Float32(1.0)
+        trainval_fraction_ = 1f0
     else
         batchsize_ = 128
         num_cells_ = 8
         channels_ = 16
-        trainval_fraction_ = Float32(1.0)
+        trainval_fraction_ = 1f0
     end
     global batchsize_
     global num_cells_
@@ -61,7 +61,7 @@ function parse_commandline()
         "--val_split"
             help = "fraction of train/val set to use as val set"
             arg_type = Float32
-            default = Float32(0.5)
+            default = 5f-1
         "--trainval_fraction"
             help = "total fraction of train/val set to use"
             arg_type = Float32
@@ -69,7 +69,7 @@ function parse_commandline()
         "--test_fraction"
             help = "fraction of test set to use"
             arg_type = Float32
-            default = Float32(1.0)
+            default = 1f0
         "--num_cells"
             help = "number of cells in supernet"
             arg_type = Int
@@ -81,7 +81,7 @@ function parse_commandline()
         "--rho"
             help = "admm parameter"
             arg_type = Float32
-            default = Float32(1e-3)
+            default = 1f-3
     end
 
     return parse_args(s)
@@ -94,22 +94,22 @@ function parse_commandline_eval()
         batchsize_ = 4
         num_cells_ = 20
         channels_ = 36
-        trainval_fraction_ = Float32(0.004)
+        trainval_fraction_ = 4f-3
     elseif gpumem < 12.0
         batchsize_ = 64
         num_cells_ = 20
         channels_ = 36
-        trainval_fraction_ = Float32(1.0)
+        trainval_fraction_ = 1f0
     elseif gpumem < 16.0
         batchsize_ = 96
         num_cells_ = 20
         channels_ = 36
-        trainval_fraction_ = Float32(1.0)
+        trainval_fraction_ = 1f0
     else
         batchsize_ = 128
         num_cells_ = 20
         channels_ = 36
-        trainval_fraction_ = Float32(1.0)
+        trainval_fraction_ = 1f0
     end
     global batchsize_
     global num_cells_
@@ -142,7 +142,7 @@ function parse_commandline_eval()
         "--val_split"
             help = "fraction of train/val set to use as val set"
             arg_type = Float32
-            default = Float32(0.0)
+            default = 0f0
         "--trainval_fraction"
             help = "total fraction of train/val set to use"
             arg_type = Float32
@@ -150,7 +150,7 @@ function parse_commandline_eval()
         "--test_fraction"
             help = "fraction of test set to use"
             arg_type = Float32
-            default = Float32(1.0)
+            default = 1f0
         "--num_cells"
             help = "number of cells in supernet"
             arg_type = Int
@@ -162,11 +162,11 @@ function parse_commandline_eval()
         "--droppath"
             help = "droppath probability"
             arg_type = Float32
-            default = Float32(0.2)
+            default = 2f-1
         "--aux"
             help = "weight of auxiliary loss"
             arg_type = Float32
-            default = Float32(0.4)
+            default = 4f-1
     end
 
     return parse_args(s)
@@ -196,7 +196,7 @@ end
 function accuracy_batched(m, xy; pert = [])
     CUDA.reclaim()
     GC.gc()
-    score = 0.0
+    score = 0f0
     count = 0
     for batch in CuIterator(xy)
         @show acc = accuracy(m, batch..., pert = pert)
@@ -307,11 +307,11 @@ function save_progress()
     m_cpu = m |> cpu
     normal_αs = m_cpu.normal_αs
     reduce_αs = m_cpu.reduce_αs
-    BSON.@save joinpath(base_folder, "model.bson") m_cpu
+    BSON.@save joinpath(base_folder, "model.bson") m_cpu args
     BSON.@save joinpath(base_folder, "alphas.bson") normal_αs reduce_αs
     BSON.@save joinpath(base_folder, "histepoch.bson") histepoch
     BSON.@save joinpath(base_folder, "histbatch.bson") histbatch
     if args["checkpoint"] > 0 && length(histepoch.train_losses) % args["checkpoint"] == 0
-        BSON.@save joinpath(base_folder, string("model", length(histepoch.train_losses), ".bson")) m_cpu
+        BSON.@save joinpath(base_folder, string("model", length(histepoch.train_losses), ".bson")) m_cpu args
     end
 end

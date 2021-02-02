@@ -20,8 +20,8 @@ if args["random_seed"] > -1
 end
 num_ops = length(PRIMITIVES)
 
-optimiser_α = Optimiser(WeightDecay(1e-3),ADAM(3e-4,(0.5,0.999)))
-optimiser_w = Optimiser(WeightDecay(3e-4),CosineAnnealing(args["epochs"]),Momentum(0.025, 0.9))
+optimiser_α = Optimiser(WeightDecay(1f-3),ADAM(3f-4,(0.5f0,0.999f0)))
+optimiser_w = Optimiser(WeightDecay(3f-4),CosineAnnealing(args["epochs"]),Momentum(0.025f0, 0.9f0))
 #optimiser_w = Optimiser(WeightDecay(3e-4),Momentum(0.025, 0.9))
 
 train, val = get_processed_data(args["val_split"], args["batchsize"], args["trainval_fraction"], args["random_seed"])
@@ -47,8 +47,8 @@ function (hist::historiessml)()
     GC.gc()
 end
 
-m = DARTSModelBN(num_cells = args["num_cells"], channels = args["channels"]) |> gpu
-zu = ADMMaux(0*vcat(m.normal_αs, m.reduce_αs), 0*vcat(m.normal_αs, m.reduce_αs))
+m = DARTSModelBN(num_cells = args["num_cells"], channels = args["channels"])
+zu = ADMMaux(0f0*vcat(m.normal_αs, m.reduce_αs), 0f0*vcat(m.normal_αs, m.reduce_αs))
 local epoch
 for epoch in 1:args["epochs"]
     @show epoch

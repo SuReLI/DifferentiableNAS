@@ -69,7 +69,7 @@ mutable struct ADMMaux
     us::AbstractArray
 end
 
-function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1e-3, losses=[0.0,0.0], epoch = 1, tmax = 50, disc = -1; cbepoch = () -> (), cbbatch = () -> ())
+function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1f-3, losses=[0f0,0f0], epoch = 1, tmax = 50, disc = -1; cbepoch = () -> (), cbbatch = () -> ())
     zs = zu.zs
     us = zu.us
     w = all_ws_sansbn(model)

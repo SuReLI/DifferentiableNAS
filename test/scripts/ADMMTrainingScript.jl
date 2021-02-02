@@ -22,8 +22,8 @@ end
 
 num_ops = length(PRIMITIVES)
 
-optimiser_α = Optimiser(WeightDecay(1e-3),ADAM(3e-4,(0.5,0.999)))
-optimiser_w = Optimiser(WeightDecay(3e-4),CosineAnnealing(args["epochs"]),Momentum(0.025, 0.9))
+optimiser_α = Optimiser(WeightDecay(1f-3),ADAM(3f-4,(0.5f0,0.999f0)))
+optimiser_w = Optimiser(WeightDecay(3f-4),CosineAnnealing(args["epochs"]),Momentum(0.025f0, 0.9f0))
 #optimiser_w = Optimiser(WeightDecay(3e-4),Momentum(0.025, 0.9))
 
 train, val = get_processed_data(args["val_split"], args["batchsize"], args["trainval_fraction"], args["random_seed"])
@@ -31,12 +31,12 @@ test = get_test_data(args["test_fraction"], args["random_seed"])
 
 histepoch = historiessml()
 histbatch = historiessml()
-losses = [0.0, 0.0]
+losses = [0f0, 0f0]
 
 base_folder = prepare_folder("admm", args)
 
 cbepoch = CbAll(histepoch, save_progress)
-cbbatch = CbAll(histbatch)
+cbbatch = CbAll(histbatch, GC.gc)
 
 function (hist::historiessml)()
     @show losses
@@ -50,7 +50,7 @@ function (hist::historiessml)()
 end
 
 m = DARTSModelBN(num_cells = args["num_cells"], channels = args["channels"]) |> gpu
-zu = ADMMaux(0*vcat(m.normal_αs, m.reduce_αs), 0*vcat(m.normal_αs, m.reduce_αs))
+zu = ADMMaux(0f0*vcat(m.normal_αs, m.reduce_αs), 0f0*vcat(m.normal_αs, m.reduce_αs))
 disc = 7
 for epoch in 1:args["epochs"]
     local zu
@@ -61,7 +61,7 @@ for epoch in 1:args["epochs"]
     else
         @time ADMMtrain1st!(loss, m, train, val, optimiser_w, optimiser_α, zu, args["rho"], losses, epoch, args["epochs"], disc; cbepoch = cbepoch, cbbatch = cbbatch)
         if epoch%5 == 0
-            zu = ADMMaux(0*vcat(m.normal_αs, m.reduce_αs), 0*vcat(m.normal_αs, m.reduce_αs))
+            zu = ADMMaux(0f0*vcat(m.normal_αs, m.reduce_αs), 0f0*vcat(m.normal_αs, m.reduce_αs))
             disc -= 1
         end
     end

@@ -20,12 +20,12 @@ if args["random_seed"] > -1
     Random.seed!(args["random_seed"])
 end
 
-optimiser = Optimiser(WeightDecay(3e-4),CosineAnnealing(args["epochs"]),Momentum(0.025, 0.9))
+optimiser = Optimiser(WeightDecay(3f-4),CosineAnnealing(args["epochs"]),Momentum(0.025f0, 0.9f0))
 
 train, val = get_processed_data(args["val_split"], args["batchsize"], args["trainval_fraction"], args["random_seed"])
 test = get_test_data(args["test_fraction"], args["random_seed"])
 
-losses = [0.0, 0.0]
+losses = [0f0, 0f0]
 
 function (hist::historiessml)()
     push!(hist.train_losses, losses[1])
@@ -60,7 +60,7 @@ end
 function accuracy_batched(m, xy)
     CUDA.reclaim()
     GC.gc()
-    score = 0.0
+    score = 0f0
     count = 0
     for batch in TestCuIterator(xy)
         acc = accuracy(m, batch...)

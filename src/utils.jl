@@ -67,8 +67,8 @@ function all_ws_sansbn(model) #without batchnorm params
     all_w
 end
 
-CIFAR_MEAN = [0.49139968, 0.48215827, 0.44653124] |> f32
-CIFAR_STD = [0.24703233, 0.24348505, 0.26158768] |> f32
+CIFAR_MEAN = [0.49139968f0, 0.48215827f0, 0.44653124f0]
+CIFAR_STD = [0.24703233f0, 0.24348505f0, 0.26158768f0]
 
 function flip_batch!(batch::Array{Float32,4})
 	flips = falses(size(batch,4))
@@ -92,17 +92,17 @@ function shift_batch!(batch::Array{Float32,4})
 		shifty = rand(-4:4)
 		if shiftx > 0
 			batch[1:size(batch,1)-shiftx,:,:,image] = orig[shiftx+1:size(batch,1),:,:]
-			batch[size(batch,1)-shiftx+1:size(batch,1),:,:,image] .= 0
+			batch[size(batch,1)-shiftx+1:size(batch,1),:,:,image] .= 0f0
 		elseif shiftx < 0
-			batch[1:-shiftx,:,:,image] .= 0
+			batch[1:-shiftx,:,:,image] .= 0f0
 			batch[1-shiftx:size(batch,1),:,:,image] = orig[1:size(batch,1)+shiftx,:,:]
 		end
 		orig = copy(batch[:,:,:,image])
 		if shifty > 0
 			batch[:,1:size(batch,2)-shifty,:,image] = orig[:,shifty+1:size(batch,2),:]
-			batch[:,size(batch,2)-shifty+1:size(batch,2),:,image] .= 0
+			batch[:,size(batch,2)-shifty+1:size(batch,2),:,image] .= 0f0
 		elseif shifty < 0
-			batch[:,1:-shifty,:,image] .= 0
+			batch[:,1:-shifty,:,image] .= 0f0
 			batch[:,1-shifty:size(batch,2),:,image] = orig[:,1:size(batch,2)+shifty,:]
 		end
 		shifts[image,:] = [shiftx;shifty]
@@ -120,7 +120,7 @@ function cutout_batch!(batch::Array{Float32,4}, cutout::Int = -1)
 			maxx = minimum([cutx+cutout÷2-1,size(batch,1)])
 			miny = maximum([cuty-cutout÷2,1])
 			maxy = minimum([cuty+cutout÷2-1,size(batch,2)])
-			batch[minx:maxx,miny:maxy,:,image] .= 0
+			batch[minx:maxx,miny:maxy,:,image] .= 0f0
 			cutouts[image,:] = [cutx;cuty]
 		end
 	end

@@ -7,7 +7,7 @@ using Base.Iterators: partition
 using Random
 using Statistics
 
-function get_test_data(get_proportion = 1.0, batchsize = 0, random_seed = -1)
+function get_test_data(get_proportion = 1f0, batchsize = 0, random_seed = -1)
 	if random_seed > -1
 	    Random.seed!(random_seed)
 	end
@@ -27,7 +27,7 @@ function get_test_data(get_proportion = 1.0, batchsize = 0, random_seed = -1)
 end
 
 
-function get_processed_data(splitr = 0.5, batchsize = 64, mini = 1.0, val_batchsize = 0, random_seed = -1)
+function get_processed_data(splitr = 0.5f0, batchsize = 64, mini = 1f0, val_batchsize = 0, random_seed = -1)
 	if random_seed > -1
 	    Random.seed!(random_seed)
 	end

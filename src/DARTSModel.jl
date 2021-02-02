@@ -27,7 +27,7 @@ ReLUConvBN(channels_in, channels_out, kernel_size, stride, pad) =
         x -> relu.(x),
         Conv(kernel_size, channels_in => channels_out, bias = false),
         BatchNorm(channels_out),
-    ) |> gpu
+    )
 
 function FactorizedReduce(channels_in, channels_out, stride)
     odd =
@@ -49,7 +49,7 @@ function FactorizedReduce(channels_in, channels_out, stride)
         x -> relu.(x),
         x -> cat(odd(x), even(x[2:end, 2:end, :, :]), dims = 3), #TODO get rid of indexing
         BatchNorm(channels_out),
-    ) |> gpu
+    )
 end
 
 SepConv(channels_in, channels_out, kernel_size, stride, pad) =
@@ -86,7 +86,7 @@ SepConv(channels_in, channels_out, kernel_size, stride, pad) =
             bias = false,
         ),
         BatchNorm(channels_out),
-    ) |> gpu
+    )
 
 DilConv(channels_in, channels_out, kernel_size, stride, pad, dilation) =
     Chain(
@@ -107,7 +107,7 @@ DilConv(channels_in, channels_out, kernel_size, stride, pad, dilation) =
             bias = false,
         ),
         BatchNorm(channels_out),
-    ) |> gpu
+    )
 
 SepConv_v(channels_in, channels_out, kernel_size, stride, pad) =
     Chain(
@@ -143,7 +143,7 @@ SepConv_v(channels_in, channels_out, kernel_size, stride, pad) =
             bias = false,
         ),
         BatchNorm(channels_out),
-    ) |> gpu
+    )
 
 DilConv_v(channels_in, channels_out, kernel_size, stride, pad, dilation) =
     Chain(
@@ -164,17 +164,17 @@ DilConv_v(channels_in, channels_out, kernel_size, stride, pad, dilation) =
             bias = false,
         ),
         BatchNorm(channels_out),
-    ) |> gpu
+    )
 
 
-Identity(stride, pad) = x -> x |> gpu
-#Zero(stride, pad) = x -> x[1:stride:end, 1:stride:end, :, :] * 0 |> gpu
-#Zero(stride) = Chain(MeanPool((1, 1), stride = stride), x -> 0*x)
-Zero(stride) = stride == 2 ? Chain(MeanPool((1, 1), stride = stride), x -> 0*x) : x -> 0*x
+Identity(stride, pad) = x -> x
+Zero(stride) =
+    stride == 2 ? Chain(MeanPool((1, 1), stride = stride), x -> 0*x) :
+    x -> 0*x
 
 SkipConnect(channels_in, channels_out, stride, pad) =
-    stride == 1 ? Identity(stride, pad) |> gpu :
-    FactorizedReduce(channels_in, channels_out, stride) |> gpu
+    stride == 1 ? Identity(stride, pad) :
+    FactorizedReduce(channels_in, channels_out, stride)
 
 struct AdaptiveMeanPool{N}
     target_out::NTuple{N,Int}
@@ -186,7 +186,7 @@ AdaptiveMeanPool(target_out::NTuple{N,Integer}) where {N} =
 function (m::AdaptiveMeanPool)(x)
     w = size(x, 1) - m.target_out[1] + 1
     h = size(x, 2) - m.target_out[2] + 1
-    return meanpool(x, (w, h); pad = (0, 0), stride = (1, 1)) |> gpu
+    return meanpool(x, (w, h); pad = (0, 0), stride = (1, 1))
 end
 
 PRIMITIVES = [
@@ -204,37 +204,37 @@ PRIMITIVES = [
 
 #TODO: change to NamedTuple
 OPS = Dict(
-    "none" => (channels, stride, w) -> Chain(Zero(stride)) |> gpu,
+    "none" => (channels, stride, w) -> Chain(Zero(stride)),
     "avg_pool_3x3" =>
         (channels, stride, w) ->
             Chain(
                 MeanPool((3, 3), stride = stride, pad = 1),
                 BatchNorm(channels),
-            ) |> gpu,
+            ),
     "max_pool_3x3" =>
         (channels, stride, w) ->
             Chain(
                 MaxPool((3, 3), stride = stride, pad = 1),
                 BatchNorm(channels),
-            ) |> gpu,
+            ),
     "skip_connect" =>
         (channels, stride, w) ->
-            Chain(SkipConnect(channels, channels, stride, 1)) |> gpu,
+            Chain(SkipConnect(channels, channels, stride, 1)),
     "sep_conv_3x3" =>
         (channels, stride, w) ->
-            SepConv_v(channels, channels, (3, 3), stride, 1) |> gpu,
+            SepConv_v(channels, channels, (3, 3), stride, 1),
     "sep_conv_5x5" =>
         (channels, stride, w) ->
-            SepConv_v(channels, channels, (5, 5), stride, 2) |> gpu,
+            SepConv_v(channels, channels, (5, 5), stride, 2),
     "sep_conv_7x7" =>
         (channels, stride, w) ->
-            SepConv_v(channels, channels, (7, 7), stride, 3) |> gpu,
+            SepConv_v(channels, channels, (7, 7), stride, 3),
     "dil_conv_3x3" =>
         (channels, stride, w) ->
-            DilConv_v(channels, channels, (3, 3), stride, 1, 2) |> gpu,
+            DilConv_v(channels, channels, (3, 3), stride, 1, 2),
     "dil_conv_5x5" =>
         (channels, stride, w) ->
-            DilConv_v(channels, channels, (5, 5), stride, 2, 2) |> gpu,
+            DilConv_v(channels, channels, (5, 5), stride, 2, 2),
     "conv_7x1_1x7" =>
         (channels, stride, w) ->
             Chain(
@@ -254,7 +254,7 @@ OPS = Dict(
                     bias = false,
                 ),
                 BatchNorm(channels),
-            ) |> gpu,
+            ),
 )
 
 function my_softmax(xs::AbstractArray; dims = 1)
@@ -350,7 +350,7 @@ function MixedOp(
             op(string(name, "-", operation), OPS[operation](channels, stride, 1) |> gpu)
             for operation in operations
         ],
-    ) |> gpu
+    )
 end
 
 function (m::MixedOp)(
@@ -404,12 +404,14 @@ function Cell(
                     stride,
                     operations,
                     track_acts,
-                ) |> gpu
+                )
             push!(mixedops, mixedop)
         end
     end
-    Cell(steps, reduce, multiplier, prelayer1, prelayer2, mixedops) |> gpu
+    Cell(steps, reduce, multiplier, prelayer1, prelayer2, mixedops)
 end
+
+ccat(X...) = cat(X...; dims=3)
 
 function (m::Cell)(
     x1::AbstractArray,
@@ -438,7 +440,7 @@ function (m::Cell)(
         states[step+2] = state
     end
     states_ = copy(states)
-    cat(states_[m.steps+2-m.multiplier+1:m.steps+2]..., dims = 3)
+    reduce(ccat, states_[m.steps+2-m.multiplier+1:m.steps+2])
 end
 
 Flux.@functor Cell
@@ -459,7 +461,7 @@ struct DARTSModel
 end
 
 function DARTSModel(;
-    α_init = (num_ops -> 2e-3 * (rand(num_ops) .- 0.5) |> f32),
+    α_init = (num_ops -> 2f-3 * (rand(Float32, num_ops) .- 0.5f0)),
     num_classes::Int64 = 10,
     num_cells::Int64 = 8,
     channels::Int64 = 16,
@@ -499,7 +501,7 @@ function DARTSModel(;
                 i,
                 operations,
                 track_acts
-            ) |> gpu
+            )
         push!(cells, cell)
 
         reduce_previous = reduce
@@ -577,8 +579,8 @@ function MixedOpBN(
             op(string(name, "-", prim), OPS[prim](channels, stride, 1) |> gpu)
             for prim in operations
         ],
-        BatchNorm(channels)
-    ) |> gpu
+        BatchNorm(channels) |> gpu
+    )
 end
 
 function (m::MixedOpBN)(
@@ -635,11 +637,11 @@ function CellBN(
                     stride,
                     operations,
                     track_acts,
-                ) |> gpu
+                )
             push!(mixedops, mixedop)
         end
     end
-    CellBN(steps, reduce, multiplier, prelayer1, prelayer2, mixedops) |> gpu
+    CellBN(steps, reduce, multiplier, prelayer1, prelayer2, mixedops)
 end
 
 function (m::CellBN)(
@@ -669,7 +671,7 @@ function (m::CellBN)(
         states[step+2] = state
     end
     states_ = copy(states)
-    cat(states_[m.steps+2-m.multiplier+1:m.steps+2]..., dims = 3)
+    reduce(ccat, states_[m.steps+2-m.multiplier+1:m.steps+2])
 end
 
 Flux.@functor CellBN
@@ -687,7 +689,7 @@ struct DARTSModelBN
 end
 
 function DARTSModelBN(;
-    α_init = (num_ops -> atanh.(ones(num_ops) ./ num_ops + 2e-3 * (rand(num_ops) .- 0.5)) |> f32),
+    α_init = (num_ops -> atanh.(ones(Float32, num_ops) ./ num_ops + 2f-3 * (rand(Float32, num_ops) .- 0.5f0))),
     num_classes::Int64 = 10,
     num_cells::Int64 = 8,
     channels::Int64 = 16,
@@ -727,7 +729,7 @@ function DARTSModelBN(;
                 i,
                 operations,
                 track_acts,
-            ) |> gpu
+            )
         push!(cells, cell)
 
         reduce_previous = reduce
@@ -799,7 +801,7 @@ function MixedOpSig(
             for prim in operations
         ],
         BatchNorm(channels)
-    ) |> gpu
+    )
 end
 
 function (m::MixedOpSig)(
@@ -852,11 +854,11 @@ function CellSig(
                     stride,
                     operations,
                     track_acts,
-                ) |> gpu
+                )
             push!(mixedops, mixedop)
         end
     end
-    CellSig(steps, reduce, multiplier, prelayer1, prelayer2, mixedops) |> gpu
+    CellSig(steps, reduce, multiplier, prelayer1, prelayer2, mixedops)
 end
 
 function (m::CellSig)(
@@ -886,7 +888,7 @@ function (m::CellSig)(
         states[step+2] = state
     end
     states_ = copy(states)
-    cat(states_[m.steps+2-m.multiplier+1:m.steps+2]..., dims = 3)
+    reduce(ccat, states_[m.steps+2-m.multiplier+1:m.steps+2])
 end
 
 Flux.@functor CellSig
@@ -904,7 +906,7 @@ struct DARTSModelSig
 end
 
 function DARTSModelSig(;
-    α_init = (num_ops -> 2e-3 * (rand(num_ops) .- 0.5) |> f32),
+    α_init = (num_ops -> 2f-3 * (rand(Float32, num_ops) .- 0.5f0)),
     num_classes::Int64 = 10,
     num_cells::Int64 = 8,
     channels::Int64 = 16,
@@ -944,7 +946,7 @@ function DARTSModelSig(;
                 i,
                 operations,
                 track_acts,
-            ) |> gpu
+            )
         push!(cells, cell)
 
         reduce_previous = reduce
@@ -1187,7 +1189,7 @@ function (m::EvalCell)(x1::AbstractArray, x2::AbstractArray, drop_prob::Float32)
         states[step+2] = in1 + in2
     end
     states_ = copy(states)
-    cat(states_[m.steps+2-m.multiplier+1:m.steps+2]..., dims = 3)
+    reduce(ccat, states_[m.steps+2-m.multiplier+1:m.steps+2])
 end
 
 Flux.@functor EvalCell
@@ -1257,7 +1259,7 @@ end
 
 function (m::DARTSEvalModel)(
     x::AbstractArray,
-    drop_prob::Float32 = Float32(0.0),
+    drop_prob::Float32 = 0f0,
 )
     s1 = m.stem(x)
     s2 = m.stem(x)
@@ -1436,7 +1438,7 @@ end
 function (m::DARTSEvalAuxModel)(
     x::AbstractArray,
     is_training::Bool = false,
-    drop_prob::AbstractFloat = Float32(0.0),
+    drop_prob::Float32 = 0f0,
 )
     s1 = m.stem(x)
     s2 = m.stem(x)

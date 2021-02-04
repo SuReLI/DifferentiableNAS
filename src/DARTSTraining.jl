@@ -34,26 +34,39 @@ function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, losses=[0f0,0f0]
             @show accuracy(model, train_batch...)
             @show accuracy(model, val_batch...)
         end
-        gsw = gradient(w) do
-            train_loss = loss(model, train_batch...)
-            return train_loss
+        display("grad weights")
+        @time begin
+            gsw = gradient(w) do
+                train_loss = loss(model, train_batch...)
+                return train_loss
+            end
+            losses[1] = train_loss
         end
-        losses[1] = train_loss
-        foreach(CUDA.unsafe_free!, train_batch)
-        Flux.Optimise.update!(opt_w, w, gsw)
-        CUDA.reclaim()
-        gsα = gradient(α) do
-            val_loss = loss(model, val_batch...)
-            return val_loss
+        display("UnGPU val")
+        @time foreach(CUDA.unsafe_free!, train_batch)
+        display("Update weights")
+        @time Flux.Optimise.update!(opt_w, w, gsw)
+        display("Reclaim")
+        @time CUDA.reclaim()
+        display("grad alpha")
+        @time begin
+            gsα = gradient(α) do
+                val_loss = loss(model, val_batch...)
+                return val_loss
+            end
+            losses[2] = val_loss
+            if epoch == 29 || epoch == 30
+                @show losses
+            end
         end
-        losses[2] = val_loss
-        if epoch == 29 || epoch == 30
-            @show losses
-        end
-        foreach(CUDA.unsafe_free!, val_batch)
-        Flux.Optimise.update!(opt_α, α, gsα)
-        CUDA.reclaim()
-        cbbatch()
+        display("UnGPU val")
+        @time foreach(CUDA.unsafe_free!, val_batch)
+        display("Update alpha")
+        @time Flux.Optimise.update!(opt_α, α, gsα)
+        display("Reclaim")
+        @time CUDA.reclaim()
+        display("cbbatch")
+        @time cbbatch()
     end
     cbepoch()
 end

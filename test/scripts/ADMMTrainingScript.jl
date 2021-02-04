@@ -49,11 +49,10 @@ function (hist::historiessml)()
     #GC.gc()
 end
 
-m = DARTSModelBN(num_cells = args["num_cells"], channels = args["channels"]) |> gpu
+m = DARTSModelBN(num_cells = args["num_cells"], channels = args["channels"])
 zu = ADMMaux(0f0*vcat(m.normal_αs, m.reduce_αs), 0f0*vcat(m.normal_αs, m.reduce_αs))
 disc = 7
 for epoch in 1:args["epochs"]
-    local zu
     @show epoch
     display(Dates.format(convert(DateTime,now()-beginscript), "HH:MM:SS"))
     if epoch <= 5
@@ -61,8 +60,8 @@ for epoch in 1:args["epochs"]
     else
         @time ADMMtrain1st!(loss, m, train, val, optimiser_w, optimiser_α, zu, args["rho"], losses, epoch, args["epochs"], disc; cbepoch = cbepoch, cbbatch = cbbatch)
         if epoch%5 == 0
-            zu = ADMMaux(0f0*vcat(m.normal_αs, m.reduce_αs), 0f0*vcat(m.normal_αs, m.reduce_αs))
-            disc -= 1
+            global zu = ADMMaux(0f0*vcat(m.normal_αs, m.reduce_αs), 0f0*vcat(m.normal_αs, m.reduce_αs))
+            global disc -= 1
         end
     end
 end

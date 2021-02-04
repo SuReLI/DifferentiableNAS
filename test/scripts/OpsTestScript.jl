@@ -18,8 +18,7 @@ train, val = get_processed_data(args["val_split"], args["batchsize"], 0.02f0, ar
 @show args = parse_commandline()
 
 if args["random_seed"] > -1
-    Random.seed
-    !(args["random_seed"])
+    Random.seed!(args["random_seed"])
 end
 base_folder = prepare_folder("optest", args)
 
@@ -29,6 +28,10 @@ cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)
 
 for prim in PRIMITIVES
     @show beginscript = now()
+    global args
+    global base_folder
+    global cbepoch
+    global cbbatch
 
     m = DARTSModel(num_cells = args["num_cells"], channels = args["channels"], operations = [prim])
 

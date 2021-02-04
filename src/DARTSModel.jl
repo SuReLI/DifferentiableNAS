@@ -167,13 +167,13 @@ DilConv_v(channels_in, channels_out, kernel_size, stride, pad, dilation) =
     )
 
 
-Identity(stride, pad) = x -> x
+Identity() = x -> x
 Zero(stride) =
     stride == 2 ? Chain(MeanPool((1, 1), stride = stride), x -> 0*x) :
     x -> 0*x
 
 SkipConnect(channels_in, channels_out, stride, pad) =
-    stride == 1 ? Identity(stride, pad) :
+    stride == 1 ? Identity() :
     FactorizedReduce(channels_in, channels_out, stride)
 
 struct AdaptiveMeanPool{N}
@@ -354,7 +354,7 @@ end
 
 function (m::MixedOp)(
     x::AbstractArray,
-    αs::AbstractArray,
+    αs::AbstractArray = [1f0],
     acts::Union{Nothing,Dict} = nothing,
 )
     as = my_softmax(copy(αs))

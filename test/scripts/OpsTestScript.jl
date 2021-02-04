@@ -35,17 +35,13 @@ for _ in 1:2
         optimiser_α = Optimiser(WeightDecay(1f-3),ADAM(3f-4,(0.5f0,0.999f0)))
         optimiser_w = Optimiser(WeightDecay(3f-4),CosineAnnealing(args["epochs"]),Momentum(0.025f0, 0.9f0))
 
-        histepoch = historiessml()
-        histbatch = historiessml()
-        cbepoch = CbAll(CUDA.reclaim, histepoch, save_progress, CUDA.reclaim)
-        cbbatch = CbAll(CUDA.reclaim, histbatch, CUDA.reclaim)
         losses = [0f0, 0f0]
 
         for epoch in 1:1
             @show epoch
             display(Dates.format(convert(DateTime,now()-beginscript), "HH:MM:SS"))
             @show prim
-            @time DARTStrain1st!(loss, m, train, val, optimiser_α, optimiser_w, losses, epoch; cbepoch = cbepoch, cbbatch = cbbatch)
+            @time DARTStrain1st!(loss, m, train, val, optimiser_α, optimiser_w, losses, epoch)
         end
         display(("done", Dates.format(convert(DateTime,now()-beginscript), "HH:MM:SS")))
     end

@@ -1020,10 +1020,13 @@ function discretize(
     plotting::Bool = false,
     disclude_1::Bool = true,
 )
+    if operations == PRIMITIVES && size(αs[1],1) == 7
+        operations = operations[2:end]
+    end
     if "none" in operations
-        disclude_1 = false
-    else
         disclude_1 = true
+    else
+        disclude_1 = false
     end
     ops = []
     opnames = []

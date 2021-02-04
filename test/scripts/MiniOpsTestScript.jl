@@ -32,7 +32,7 @@ for _ in 1:2
         global cbepoch
         global cbbatch
 
-        m = Parallel(+,[MixedOp(1,"1-2",3,1,[prim]) for _ in 1:8*14*8]...)
+        m = Chain([MixedOp(1,"1-2",3,1,[prim]) for _ in 1:8*14*8]...) |> gpu
 
         optimiser_α = Optimiser(WeightDecay(1f-3),ADAM(3f-4,(0.5f0,0.999f0)))
         optimiser_w = Optimiser(WeightDecay(3f-4),CosineAnnealing(args["epochs"]),Momentum(0.025f0, 0.9f0))

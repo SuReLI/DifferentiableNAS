@@ -12,10 +12,10 @@ using Dates
 include("../CIFAR10.jl")
 include("../training_utils.jl")
 
+@show args = parse_commandline()
+
 train, val = get_processed_data(args["val_split"], args["batchsize"], 0.02f0, args["random_seed"])
 @show size(train[1][1])
-
-@show args = parse_commandline()
 
 if args["random_seed"] > -1
     Random.seed!(args["random_seed"])

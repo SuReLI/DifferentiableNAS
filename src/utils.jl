@@ -141,19 +141,16 @@ mutable struct TrainCuIterator{B}
     TrainCuIterator(batches) = new{typeof(batches)}(batches)
 end
 function Base.iterate(c::TrainCuIterator, state...)
-	display("traincuiterator")
-	@time begin
-	    item = iterate(c.batches, state...)
-	    isdefined(c, :previous) && foreach(CUDA.unsafe_free!, c.previous)
-	    item === nothing && return nothing
-	    batch, next_state = item
-		flip_batch!(batch[1])
-		shift_batch!(batch[1])
-		norm_batch!(batch[1])
-	    cubatch = map(x -> adapt(CuArray, x), batch)
-	    c.previous = cubatch
-	end
-	return cubatch, next_state
+    item = iterate(c.batches, state...)
+    isdefined(c, :previous) && foreach(CUDA.unsafe_free!, c.previous)
+    item === nothing && return nothing
+    batch, next_state = item
+	flip_batch!(batch[1])
+	shift_batch!(batch[1])
+	norm_batch!(batch[1])
+    cubatch = map(x -> adapt(CuArray, x), batch)
+    c.previous = cubatch
+=	return cubatch, next_state
 end
 
 mutable struct EvalCuIterator{B}

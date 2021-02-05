@@ -282,7 +282,14 @@ struct CbAll
 end
 CbAll(cbs...) = CbAll(cbs)
 
-(cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
+function timefunc(func)
+    @show func
+    @time out = func()
+    out
+end
+
+
+(cba::CbAll)() = foreach(cb -> timefunc(cb), cba.cbs)
 
 function prepare_folder(algo::String, args::Dict)
     if "SLURM_JOB_ID" in keys(ENV)

@@ -150,7 +150,7 @@ function Base.iterate(c::TrainCuIterator, state...)
 	norm_batch!(batch[1])
     cubatch = map(x -> adapt(CuArray, x), batch)
     c.previous = cubatch
-=	return cubatch, next_state
+	return cubatch, next_state
 end
 
 mutable struct EvalCuIterator{B}

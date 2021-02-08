@@ -10,7 +10,7 @@ using Distributions: Bernoulli
     mo = MixedOp(1,"1-2",4,1)  |> gpu
     @test length(Flux.params(mo).order |> cpu) > 0
     data = rand(Float32,8,8,4,2)  |> gpu
-    α = rand(Float32, num_ops)  |> gpu
+    α = rand(Float32, num_ops)
     @test size(data) == size(mo(data, α))
     g = gradient((x,α) -> sum(mo(x, α)), data, α)
     @test size(data) == size(g[1])
@@ -24,7 +24,7 @@ end
     data = rand(Float32,8,8,4,2) |> gpu
     cell = Cell(4, 4, 1, false, false, 4, 4, 1) |> gpu
     @test length(Flux.params(cell).order) > 0
-    as = [2e-3*(rand(num_ops).-0.5) |> f32 |> gpu  for _ in 1:k]
+    as = [2e-3*(rand(num_ops).-0.5) |> f32   for _ in 1:k]
     @test size(data) == size(cell(data, data, as))
     grad = gradient((x1, x2, αs) -> sum(cell(x1, x2, αs)), data, data, as)
     @test size(data) == size(grad[1])
@@ -35,7 +35,7 @@ end
     k = floor(Int, steps^2/2+3*steps/2)
     num_ops = length(PRIMITIVES)
     data = rand(Float32,8,8,4,2) |> gpu
-    masked_αs = [2e-3*(rand(num_ops).-0.5).*rand(Bernoulli(),num_ops) |> f32 |> gpu  for _ in 1:k]
+    masked_αs = [2e-3*(rand(num_ops).-0.5).*rand(Bernoulli(),num_ops) |> f32 for _ in 1:k]
     m = DARTSModel(track_acts = true) |> gpu
     @test length(Flux.params(m).order) > 1
     @test length(Flux.params(m.cells).order) > 1
@@ -64,10 +64,9 @@ end
     k = floor(Int, steps^2/2+3*steps/2)
     num_ops = length(PRIMITIVES)
     data = rand(Float32,8,8,4,2) |> gpu
-    αs = [2e-3*(rand(num_ops).-0.5) |> f32 |> gpu  for _ in 1:k]
+    αs = [2e-3*(rand(num_ops).-0.5) |> f32  for _ in 1:k]
     cell = EvalCell(4, 4, 1, false, false, 4, 4, αs, PRIMITIVES) |> gpu
     @test length(Flux.params(cell).order) > 0
-    as = [2e-3*(rand(num_ops).-0.5) |> f32 |> gpu  for _ in 1:k]
     @test size(data) == size(cell(data, data, 0.4f0))
     grad = gradient((x1, x2) -> sum(cell(x1, x2, 0.4f0)), data, data)
     @test size(data) == size(grad[1])
@@ -77,8 +76,8 @@ end
     steps = 4
     k = floor(Int, steps^2/2+3*steps/2)
     num_ops = length(PRIMITIVES)
-    normal = [2e-3*(rand(num_ops).-0.5) |> f32 |> gpu  for _ in 1:k]
-    reduce = [2e-3*(rand(num_ops).-0.5) |> f32 |> gpu  for _ in 1:k]
+    normal = [2e-3*(rand(num_ops).-0.5) |> f32 for _ in 1:k]
+    reduce = [2e-3*(rand(num_ops).-0.5) |> f32 for _ in 1:k]
     m = DARTSEvalModel(normal, reduce) |> gpu
     @test length(Flux.params(m).order) > 1
     @test length(Flux.params(m.cells).order) > 1
@@ -97,8 +96,8 @@ end
     steps = 4
     k = floor(Int, steps^2/2+3*steps/2)
     num_ops = length(PRIMITIVES)
-    normal = [2e-3*(rand(num_ops).-0.5) |> f32 |> gpu  for _ in 1:k]
-    reduce = [2e-3*(rand(num_ops).-0.5) |> f32 |> gpu  for _ in 1:k]
+    normal = [2e-3*(rand(num_ops).-0.5) |> f32  for _ in 1:k]
+    reduce = [2e-3*(rand(num_ops).-0.5) |> f32  for _ in 1:k]
     m = DARTSEvalAuxModel(normal, reduce) |> gpu
     @test length(Flux.params(m).order) > 1
     @test length(Flux.params(m.cells).order) > 1

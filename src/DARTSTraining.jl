@@ -42,12 +42,9 @@ function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, losses=[0f0,0f0]
             end
             losses[1] = train_loss
         end
-        display("UnGPU val")
-        @time foreach(CUDA.unsafe_free!, train_batch)
-        display("Update weights")
-        @time Flux.Optimise.update!(opt_w, w, gsw)
-        display("Reclaim")
-        @time CUDA.reclaim()
+        foreach(CUDA.unsafe_free!, train_batch)
+        Flux.Optimise.update!(opt_w, w, gsw)
+        CUDA.reclaim()
         display("grad alpha")
         @time begin
             gsα = gradient(α) do
@@ -59,14 +56,10 @@ function DARTStrain1st!(loss, model, train, val, opt_α, opt_w, losses=[0f0,0f0]
                 @show losses
             end
         end
-        display("UnGPU val")
-        @time foreach(CUDA.unsafe_free!, val_batch)
-        display("Update alpha")
-        @time Flux.Optimise.update!(opt_α, α, gsα)
-        display("Reclaim")
-        @time CUDA.reclaim()
-        display("cbbatch")
-        @time cbbatch()
+        foreach(CUDA.unsafe_free!, val_batch)
+        Flux.Optimise.update!(opt_α, α, gsα)
+        CUDA.reclaim()
+        cbbatch()
     end
     cbepoch()
 end

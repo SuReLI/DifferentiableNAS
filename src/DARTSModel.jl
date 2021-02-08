@@ -94,16 +94,16 @@ DilConv(channels_in, channels_out, kernel_size, stride, pad, dilation) =
         DepthwiseConv(
             kernel_size,
             channels_in => channels_in,
-            pad = (pad, pad),
+            pad = (pad * dilation, pad * dilation),
             stride = (stride, stride),
             dilation = dilation,
             bias = false,
         ),
         Conv(
-            kernel_size,
+            (1,1),
             channels_in => channels_out,
             stride = (1, 1),
-            pad = (pad, pad),
+            pad = (0, 0),
             bias = false,
         ),
         BatchNorm(channels_out),
@@ -157,10 +157,10 @@ DilConv_v(channels_in, channels_out, kernel_size, stride, pad, dilation) =
             bias = false,
         ),
         Conv(
-            kernel_size,
+            (1,1),
             channels_in => channels_out,
             stride = (1, 1),
-            pad = (pad, pad),
+            pad = (0, 0),
             bias = false,
         ),
         BatchNorm(channels_out),
@@ -221,19 +221,19 @@ OPS = Dict(
             Chain(SkipConnect(channels, channels, stride, 1)),
     "sep_conv_3x3" =>
         (channels, stride, w) ->
-            SepConv_v(channels, channels, (3, 3), stride, 1),
+            SepConv(channels, channels, (3, 3), stride, 1) |> gpu,
     "sep_conv_5x5" =>
         (channels, stride, w) ->
-            SepConv_v(channels, channels, (5, 5), stride, 2),
+            SepConv(channels, channels, (5, 5), stride, 2),
     "sep_conv_7x7" =>
         (channels, stride, w) ->
-            SepConv_v(channels, channels, (7, 7), stride, 3),
+            SepConv(channels, channels, (7, 7), stride, 3),
     "dil_conv_3x3" =>
         (channels, stride, w) ->
-            DilConv_v(channels, channels, (3, 3), stride, 1, 2),
+            DilConv(channels, channels, (3, 3), stride, 1, 2),
     "dil_conv_5x5" =>
         (channels, stride, w) ->
-            DilConv_v(channels, channels, (5, 5), stride, 2, 2),
+            DilConv(channels, channels, (5, 5), stride, 2, 2),
     "conv_7x1_1x7" =>
         (channels, stride, w) ->
             Chain(
@@ -361,6 +361,19 @@ function (m::MixedOp)(
     sum(as[i] * m.ops[i](x, acts, m.cellid) for i = 1:length(as))
 end
 
+function (m::MixedOp)(
+    x::AbstractArray,
+    αs::AbstractArray = [1f0],
+    precompute::AbstractArray = [false, []],
+)
+    as = my_softmax(copy(αs))
+    if !precompute[1]
+        precompute[2] = [m.ops[i](x, acts, m.cellid) for i = 1:length(as)]
+        precompute[1] = true
+    end
+    sum(as[i] * precompute[2][i] for i = 1:length(as))
+end
+
 Flux.@functor MixedOp
 
 struct Cell
@@ -424,6 +437,12 @@ function (m::Cell)(
     states[1] = state1
     states[2] = state2
     offset = 0
+    #precompute = Array{Array{Float32,4}}(undef, m.steps + 1)
+    #precompute = Zygote.Buffer([], m.steps + 1)
+    #for i = 1:m.steps+1
+        #precompute[i] = [false, []]
+    #end
+    #@display(typeof(precompute))
     for step = 1:m.steps
         state = mapreduce(
             (mixedop, α, previous_state) ->
@@ -431,8 +450,19 @@ function (m::Cell)(
             +,
             m.mixedops[offset+1:offset+step+1],
             αs[offset+1:offset+step+1],
-            states,
+            states
         )
+        """
+        state = mapreduce(
+            (mixedop, α, previous_state, precomputed) ->
+                mixedop(previous_state, α, precomputed, acts),
+            +,
+            m.mixedops[offset+1:offset+step+1],
+            αs[offset+1:offset+step+1],
+            states,
+            precompute
+        )
+        """
         offset += step + 1
         states[step+2] = state
     end

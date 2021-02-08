@@ -14,10 +14,10 @@ using ArgParse
 function parse_commandline()
     gpumem = CUDA.totalmem(collect(CUDA.devices())[1])/(1024^3)
     if gpumem < 2.0
-        batchsize_ = 32
+        batchsize_ = 16
         num_cells_ = 4
         channels_ = 4
-        trainval_fraction_ = 2f-2
+        trainval_fraction_ = 2f-3
     elseif gpumem < 12.0
         batchsize_ = 32
         num_cells_ = 8
@@ -266,7 +266,7 @@ end
 historiessml() = historiessml([],[],[],[],[],[])
 
 function (hist::historiessml)()
-    #@show losses
+    @show losses
     push!(hist.normal_αs_sm, softmax.(deepcopy(m.normal_αs)) |> cpu)
     push!(hist.reduce_αs_sm, softmax.(deepcopy(m.reduce_αs)) |> cpu)
     #push!(hist.activations, copy(m.activations.currentacts) |> cpu)
@@ -289,7 +289,7 @@ function timefunc(func)
 end
 
 
-(cba::CbAll)() = foreach(cb -> timefunc(cb), cba.cbs)
+(cba::CbAll)() = foreach(cb -> cb(), cba.cbs)
 
 function prepare_folder(algo::String, args::Dict)
     if "SLURM_JOB_ID" in keys(ENV)
@@ -314,7 +314,7 @@ function save_progress()
     m_cpu = m |> cpu
     normal_αs = m_cpu.normal_αs
     reduce_αs = m_cpu.reduce_αs
-    BSON.@save joinpath(base_folder, "model.bson") m_cpu args
+    #BSON.@save joinpath(base_folder, "model.bson") m_cpu args
     BSON.@save joinpath(base_folder, "alphas.bson") normal_αs reduce_αs
     BSON.@save joinpath(base_folder, "histepoch.bson") histepoch
     BSON.@save joinpath(base_folder, "histbatch.bson") histbatch

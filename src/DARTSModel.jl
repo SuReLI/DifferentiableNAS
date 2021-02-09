@@ -266,8 +266,9 @@ Zygote.@adjoint function my_softmax(xs::AbstractArray; dims = 1)
     end
 end
 
+abstract type AbstractOp end
 
-struct OpActs
+struct OpActs <: AbstractOp
     name::String
     op::Any
 end
@@ -308,9 +309,9 @@ end
 
 Flux.@functor OpActs
 
-struct Op
+struct Op <: AbstractOp
     name::String
-    op::Any
+    op::Chain
 end
 
 function (opwrap::Op)(
@@ -323,10 +324,10 @@ end
 
 Flux.@functor Op
 
-struct MixedOp
+struct MixedOp{T<:AbstractOp}
     cellid::Int64
     name::String
-    ops::AbstractArray
+    ops::Vector{T}
 end
 
 function MixedOp(
@@ -353,8 +354,8 @@ function MixedOp(
 end
 
 function (m::MixedOp)(
-    x::AbstractArray,
-    αs::AbstractArray = [1f0],
+    x::CuArray{Float32, 4},
+    αs::Vector{Float32} = [1f0],
     acts::Union{Nothing,Dict} = nothing,
 )
     as = my_softmax(copy(αs))
@@ -362,8 +363,8 @@ function (m::MixedOp)(
 end
 
 function (m::MixedOp)(
-    x::AbstractArray,
-    αs::AbstractArray = [1f0],
+    x::CuArray{Float32, 4},
+    αs::Vector{Float32} = [1f0],
     precompute::AbstractArray = [false, []],
 )
     as = my_softmax(copy(αs))
@@ -382,7 +383,7 @@ struct Cell
     multiplier::Int64
     prelayer1::Chain
     prelayer2::Chain
-    mixedops::AbstractArray
+    mixedops::Vector{MixedOp}
 end
 
 function Cell(
@@ -424,9 +425,9 @@ function Cell(
 end
 
 function (m::Cell)(
-    x1::AbstractArray,
-    x2::AbstractArray,
-    αs::AbstractArray,
+    x1::CuArray{Float32, 4},
+    x2::CuArray{Float32, 4},
+    αs::Vector{Vector{Float32}},
     acts::Union{Nothing,Dict} = nothing,
 )
     state1 = m.prelayer1(x1)
@@ -477,10 +478,10 @@ mutable struct Activations
 end
 
 struct DARTSModel
-    normal_αs::AbstractArray
-    reduce_αs::AbstractArray
+    normal_αs::Vector{Vector{Float32}}
+    reduce_αs::Vector{Vector{Float32}}
     stem::Chain
-    cells::AbstractArray
+    cells::Array{Cell,1}
     global_pooling::AdaptiveMeanPool
     classifier::Dense
     operations::Array{String,1}
@@ -554,14 +555,25 @@ function DARTSModel(;
     )
 end
 
-function (m::DARTSModel)(x; αs::AbstractArray = [])
-    if length(αs) > 0
-        normal_αs = αs[1]
-        reduce_αs = αs[2]
-    else
-        normal_αs = m.normal_αs
-        reduce_αs = m.reduce_αs
+function (m::DARTSModel)(x)
+    normal_αs = m.normal_αs
+    reduce_αs = m.reduce_αs
+    s1 = m.stem(x)
+    s2 = m.stem(x)
+    m.activations.currentacts = Dict{String,Array{Float32,3}}()
+    for (i, cell) in enumerate(m.cells)
+        cell.reduction ? αs = reduce_αs : αs = normal_αs
+        new_state = cell(s1, s2, αs, m.activations.currentacts)
+        s1 = s2
+        s2 = new_state
     end
+    out = m.global_pooling(s2)
+    m.classifier(squeeze(out))
+end
+
+function (m::DARTSModel)(x, αs::Vector{Vector{Vector{Float32}}})
+    normal_αs = αs[1]
+    reduce_αs = αs[2]
     s1 = m.stem(x)
     s2 = m.stem(x)
     m.activations.currentacts = Dict{String,Array{Float32,3}}()

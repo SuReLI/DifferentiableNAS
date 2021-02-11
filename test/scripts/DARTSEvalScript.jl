@@ -36,7 +36,7 @@ function save_progress()
     m_cpu = m |> cpu
     normal_αs = m_cpu.normal_αs
     reduce_αs = m_cpu.reduce_αs
-    BSON.@save joinpath(base_folder, "model.bson") m_cpu optimiser
+    #BSON.@save joinpath(base_folder, "model.bson") m_cpu optimiser
     BSON.@save joinpath(base_folder, "histeval.bson") histeval
 end
 

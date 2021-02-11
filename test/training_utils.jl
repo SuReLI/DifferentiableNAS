@@ -14,7 +14,7 @@ using ArgParse
 function parse_commandline()
     gpumem = CUDA.totalmem(collect(CUDA.devices())[1])/(1024^3)
     if gpumem < 2.0
-        batchsize_ = 16
+        batchsize_ = 4
         num_cells_ = 4
         channels_ = 4
         trainval_fraction_ = 2f-3
@@ -91,12 +91,12 @@ end
 function parse_commandline_eval()
     gpumem = CUDA.totalmem(collect(CUDA.devices())[1])/(1024^3)
     if gpumem < 2.0
-        batchsize_ = 4
-        num_cells_ = 20
-        channels_ = 36
-        trainval_fraction_ = 4f-3
+        batchsize_ = 1
+        num_cells_ = 2
+        channels_ = 18
+        trainval_fraction_ = 4f-4
     elseif gpumem < 12.0
-        batchsize_ = 64
+        batchsize_ = 96
         num_cells_ = 20
         channels_ = 36
         trainval_fraction_ = 1f0
@@ -190,16 +190,34 @@ function loss(m, x, y)
 end
 
 acccb() = @show(accuracy_batched(m, val))
-function accuracy(m, x, y; pert = [])
-    out = mean(onecold(m(x, αs = pert), 1:10) .== onecold(y, 1:10))
+function accuracy(m, x, y)
+    out = mean(onecold(m(x), 1:10) .== onecold(y, 1:10))
 end
-function accuracy_batched(m, xy; pert = [])
+function accuracy(m, x, y, pert)
+    out = mean(onecold(m(x, pert), 1:10) .== onecold(y, 1:10))
+end
+function accuracy_batched(m, xy)
     CUDA.reclaim()
     GC.gc()
     score = 0f0
     count = 0
     for batch in CuIterator(xy)
-        @show acc = accuracy(m, batch..., pert = pert)
+        @show acc = accuracy(m, batch...)
+        score += acc*length(batch)
+        count += length(batch)
+        CUDA.reclaim()
+        GC.gc()
+    end
+    display(score / count)
+    score / count
+end
+function accuracy_batched(m, xy, pert)
+    CUDA.reclaim()
+    GC.gc()
+    score = 0f0
+    count = 0
+    for batch in CuIterator(xy)
+        @show acc = accuracy(m, batch..., pert)
         score += acc*length(batch)
         count += length(batch)
         CUDA.reclaim()

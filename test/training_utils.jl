@@ -19,7 +19,7 @@ function parse_commandline()
         channels_ = 4
         trainval_fraction_ = 2f-3
     elseif gpumem < 12.0
-        batchsize_ = 32
+        batchsize_ = 64
         num_cells_ = 8
         channels_ = 16
         trainval_fraction_ = 1f0

@@ -934,10 +934,10 @@ function parse_genotype(;
     for i = 1:steps
         top2 = [genocell[2*i-1][2]+1, genocell[2*i][2]+1]
         top2names = (genocell[2*i-1][1], genocell[2*i][1])
-        top2ops = Tuple(
+        top2ops = [
             OPS[top2names[j]](channels, reduce && top2[j] < 3 ? 2 : 1, 1) |> gpu
             for j in 1:2
-        )
+        ]
         inputindices[i] = top2
         opnames[i] = top2names
         ops[i] = top2ops

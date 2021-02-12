@@ -71,3 +71,33 @@ function visualize(filename::String)
     end
     g.render(filename, view=false)
 end
+
+
+function visualize_supercell(filename::String)
+    nodelabels = ["c_{k-2}", "c_{k-1}", "0", "1", "2", "3", "c_{k}"]
+    g = graphviz.Digraph(
+          format="png",
+          edge_attr=Dict("fontsize"=>"20", "fontname"=>"times"),
+          node_attr=Dict("style"=>"filled", "shape"=>"rect", "align"=>"center", "fontsize"=>"20", "height"=>"0.5", "width"=>"0.5", "penwidth"=>"2", "fontname"=>"times"),
+          engine="dot")
+    g.body = ["rankdir=LR"]
+
+    g.node(nodelabels[1], fillcolor="darkseagreen2")
+    g.node(nodelabels[2], fillcolor="darkseagreen2")
+
+    for i in 3:6
+      g.node(nodelabels[i], fillcolor="lightblue")
+    end
+
+    connects = vcat([[(j,i) for j = 1:i-1] for i = 3:6]...)
+
+    for connect in connects
+        g.edge(nodelabels[connect[1]], nodelabels[connect[2]], fillcolor="black", penwidth="3")
+    end
+
+    g.node(nodelabels[7], fillcolor="palegoldenrod")
+    for i in 3:6
+      g.edge(nodelabels[i], nodelabels[7], fillcolor="gray")
+    end
+    g.render(filename, view=false)
+end

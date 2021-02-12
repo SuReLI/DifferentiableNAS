@@ -968,7 +968,7 @@ end
 function droppath(x::CuArray{Float32, 4}, drop_prob::Float32)
     if drop_prob > 0.0
         mask = rand(Bernoulli(1 - drop_prob), 1, 1, size(x, 3), 1) |> gpu
-        x = x .* mask / (typeof(x[1])(1 - drop_prob))
+        x = x .* mask / (1 - drop_prob)
     end
     x
 end

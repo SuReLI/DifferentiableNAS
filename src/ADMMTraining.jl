@@ -102,7 +102,6 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1f-3, loss
         Flux.Optimise.update!(opt_α, α, gsα)
         CUDA.reclaim()
         as = collect_αs(model)
-        display(as.-before)
         for a in as
             a[findall(<=(0),a)] .= -Inf32
         end

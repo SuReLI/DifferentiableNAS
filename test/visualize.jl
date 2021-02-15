@@ -16,7 +16,7 @@ include("training_utils.jl")
 
 function visualize(αs, filename::String)
     nodelabels = ["c_{k-2}", "c_{k-1}", "0", "1", "2", "3", "c_{k}"]
-    inputindices, _, opnames = discretize(αs, 1, false, 4)
+    inputindices, _, opnames = discretize(αs, 1, false, 4; plotting = true)
     g = graphviz.Digraph(
           format="png",
           edge_attr=Dict("fontsize"=>"20", "fontname"=>"times"),

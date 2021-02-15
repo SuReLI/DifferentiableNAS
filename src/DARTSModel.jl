@@ -819,7 +819,7 @@ function discretize(
     αs::Vector{Vector{Float32}},
     channels::Int64,
     reduce::Bool,
-    steps::Int64,
+    steps::Int64;
     operations::Vector{String} = PRIMITIVES,
     plotting::Bool = false,
     disclude_1::Bool = true,

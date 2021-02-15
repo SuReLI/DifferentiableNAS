@@ -317,7 +317,7 @@ function prepare_folder(algo::String, args::Dict)
     end
     if ispath("/gpfs/work/p21001/maile/dnas/models/")
         model_dir = "/gpfs/work/p21001/maile/dnas/models/"
-    elseif ispath("/gpfs/work/p21001/maile/dnas/models/")
+    elseif ispath("/projets/reva/kmaile/dnas/models/")
         model_dir = "/projets/reva/kmaile/dnas/models/"
     else
         model_dir = "test/models/"

@@ -82,36 +82,50 @@ function ADMMtrain1st!(loss, model, train, val, opt_w, opt_α, zu, ρ=1f-3, loss
     @show admmupdate
     ρ *= epoch
     @show ρ
+    @show disc
     opt_w.os[2].t = epoch - 1
     for (i, train_batch, val_batch) in zip(1:length(train), TrainCuIterator(train), TrainCuIterator(val))
-        gsw = gradient(w) do
-            train_loss = loss(model, train_batch...)
-            return train_loss
+        display("grad weights")
+        @time begin
+            gsw = gradient(w) do
+                train_loss = loss(model, train_batch...)
+                return train_loss
+            end
+            losses[1] = train_loss
         end
-        losses[1] = train_loss
         foreach(CUDA.unsafe_free!, train_batch)
         Flux.Optimise.update!(opt_w, w, gsw)
         CUDA.reclaim()
-        gsα = gradient(α) do
-            val_loss = loss(model, val_batch...) + ρ/2*regterm(model, zs, us)
-            return val_loss
+        display("grad alphas")
+        @time begin
+            gsα = gradient(α) do
+                val_loss = loss(model, val_batch...) + ρ/2*regterm(model, zs, us)
+                return val_loss
+            end
+            losses[2] = val_loss
         end
-        losses[2] = val_loss
         foreach(CUDA.unsafe_free!, val_batch)
-        before = deepcopy(collect_αs(model))
         Flux.Optimise.update!(opt_α, α, gsα)
         CUDA.reclaim()
-        as = collect_αs(model)
-        for a in as
-            a[findall(<=(0),a)] .= -Inf32
+        for αs in [model.normal_αs, model.reduce_αs]
+            for a in αs
+                a[findall(<=(0),a)] .= -Inf32
+                if count(<=(0),a) == length(a)-1
+                    a[findall(>(0),a)] .= Inf32
+                end
+            end
         end
-        if i%admmupdate == 0
-            as = collect_αs(model)
-            display(as)
-            zs = euclidmap(as+us, disc)
-            display(zs)
-            us += as - zs
-            display(us)
+        display(collect_αs(model))
+        @time begin
+            if i%admmupdate == 0
+                as = collect_αs(model)
+                display(as)
+                zs = euclidmap(as+us, disc)
+                display(zs)
+                us += as - zs
+                display(us)
+            end
+            display("admm updates")
         end
         cbbatch()
     end
